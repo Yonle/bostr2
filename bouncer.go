@@ -47,6 +47,21 @@ func (s *Session) NewConn(url string) {
     return
   }
 
+  if err != nil {
+    log.Printf("Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", url);
+
+    s.Delete(index)
+    go func() {
+      time.Sleep(5 * time.Second)
+      if !s.Exist() {
+        return
+      }
+
+      s.NewConn(url)
+    }()
+    return
+  }
+
   if resp.StatusCode >= 500 {
     s.Delete(index)
 
@@ -61,21 +76,6 @@ func (s *Session) NewConn(url string) {
     return
   } else if resp.StatusCode > 101 {
     log.Printf("Получил неожиданный код статуса от %s (%s). Больше не подключаюсь.\n", url, resp.StatusCode)
-    return
-  }
-
-  if err != nil {
-    log.Printf("Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", url);
-
-    s.Delete(index)
-    go func() {
-      time.Sleep(5 * time.Second)
-      if !s.Exist() {
-        return
-      }
-
-      s.NewConn(url)
-    }()
     return
   }
 

@@ -28,9 +28,9 @@ func Accept_Websocket (w http.ResponseWriter, r *http.Request) {
 
   bouncer[conn] = &sess
 
-  sess.StartConnect()
-
   go func() {
+    sess.StartConnect()
+
     defer conn.Close()
     defer delete(bouncer, conn)
 

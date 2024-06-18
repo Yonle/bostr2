@@ -144,7 +144,7 @@ func (s *Session) StartConnect() {
     if !s.Exist() {
       break;
     }
-    s.NewConn(url);
+    go s.NewConn(url);
   }
 }
 

@@ -43,7 +43,7 @@ func (s *Session) NewConn(url string) {
   conn, resp, err := dialer.Dial(url, nil)
 
   if !s.Exist() {
-    if !err {
+    if err == nil {
       conn.Close()
     }
     return

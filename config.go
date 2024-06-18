@@ -1,0 +1,24 @@
+package main
+
+import (
+  "fmt"
+  "os"
+  "github.com/goccy/go-yaml"
+)
+
+type Config struct {
+  Listen string
+  Relays []string
+  NIP_11 map[string]interface{} `yaml:"nip_11"`
+}
+
+func ReadConfig(filename string, c *Config) {
+  data, err := os.ReadFile(filename)
+  if err != nil {
+    panic(fmt.Sprintf("error when reading %s: %s", filename, err))
+  }
+
+  if err := yaml.Unmarshal(data, c); err != nil {
+    panic(fmt.Sprintf("error when parsing %s: %s", filename, err))
+  }
+}

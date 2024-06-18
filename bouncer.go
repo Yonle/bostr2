@@ -175,13 +175,13 @@ func (s *Session) WriteJSON(data *[]interface{}) error {
 func (s *Session) REQ(data *[]interface{}) {
   subid := (*data)[1].(string)
 
-  s.CLOSE(data)
+  s.CLOSE(data, false)
   s.Event_IDs[subid] = make(map[string]struct{})
   s.PendingEOSE[subid] = 0
   s.Sub_IDs[subid] = struct{}{};
 }
 
-func (s *Session) CLOSE(data *[]interface{}) {
+func (s *Session) CLOSE(data *[]interface{}, sendClosed bool) {
   subid := (*data)[1].(string)
 
   if _, ok := s.Event_IDs[subid]; ok {
@@ -196,16 +196,17 @@ func (s *Session) CLOSE(data *[]interface{}) {
     delete(s.PendingEOSE, subid)
   }
 
-  s.WriteJSON(&[]interface{}{"CLOSED", subid, ""})
+  if sendClosed {
+    s.WriteJSON(&[]interface{}{"CLOSED", subid, ""})
+  }
 }
 
 func (s *Session) EVENT(data *[]interface{}) bool {
   event := (*data)[1].(map[string]interface{})
   id, ok := event["id"]
-  if !ok {
-    return false
+  if ok {
+    s.WriteJSON(&[]interface{}{"OK", id, true, ""})
   }
 
-  s.WriteJSON(&[]interface{}{"OK", id, true, ""})
-  return true
+  return ok
 }

@@ -189,16 +189,17 @@ func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
   defer s.mu.Unlock()
   for id, filters := range s.Sub_IDs {
     ReqData := []interface{}{"REQ", id}
-    ReqData = append(ReqData, filters)
+    ReqData = append(ReqData, *filters...)
     conn.WriteJSON(&ReqData)
   }
 }
 
 func (s *Session) Destroy(_ int, _ string) error {
-  s.destroyed = true
-
   s.mu.Lock()
   defer s.mu.Unlock()
+
+  s.destroyed = true
+
   for relay, _ := range s.Relays {
     relay.Close()
   }
@@ -207,6 +208,9 @@ func (s *Session) Destroy(_ int, _ string) error {
 }
 
 func (s *Session) REQ(data *[]interface{}) {
+  s.mu.Lock()
+  defer s.mu.Unlock()
+
   if !s.ready {
     s.StartConnect()
     s.ready = true
@@ -227,17 +231,9 @@ func (s *Session) CLOSE(data *[]interface{}, sendClosed bool) {
 
   subid := (*data)[1].(string)
 
-  if _, ok := s.Event_IDs[subid]; ok {
-    delete(s.Event_IDs, subid)
-  }
-
-  if _, ok := s.Sub_IDs[subid]; ok {
-    delete(s.Sub_IDs, subid)
-  }
-
-  if _, ok := s.PendingEOSE[subid]; ok {
-    delete(s.PendingEOSE, subid)
-  }
+  delete(s.Event_IDs, subid)
+  delete(s.Sub_IDs, subid)
+  delete(s.PendingEOSE, subid)
 
   if sendClosed {
     s.WriteJSON(&[]interface{}{"CLOSED", subid, ""})

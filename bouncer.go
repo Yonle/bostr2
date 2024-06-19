@@ -21,7 +21,6 @@ type Session struct {
   ready bool
   destroyed bool
   mu sync.Mutex
-  rwm sync.RWMutex
 }
 
 var dialer = websocket.Dialer{}
@@ -223,8 +222,8 @@ func (s *Session) REQ(data *[]interface{}) {
 }
 
 func (s *Session) CLOSE(data *[]interface{}, sendClosed bool) {
-  s.rwm.Lock()
-  defer s.rwm.Unlock()
+  s.mu.Lock()
+  defer s.mu.Unlock()
 
   subid := (*data)[1].(string)
 

@@ -85,56 +85,55 @@ func (s *Session) NewConn(url string) {
 
   log.Printf("%s присоединился к нам.\n", url)
 
-  go func() {
-    var stop bool = false
-    defer conn.Close()
+  var stop bool = false
+  defer conn.Close()
 
-    for {
-      var data []interface{}
-      if err := conn.ReadJSON(&data); err != nil {
-        log.Printf("%s: Подделано!! Отключение\n", url)
+  for {
+    var data []interface{}
+    if err := conn.ReadJSON(&data); err != nil {
+      log.Printf("%s: Подделано!! Отключение\n", url)
+      break
+    }
+
+    switch data[0].(string) {
+    case "EVENT":
+      if _, ok := s.Sub_IDs[data[1].(string)]; !ok {
+        continue
+      }
+
+      if event := data[2].(map[string]interface{}); s.HasEvent(data[1].(string), event["id"].(string)) {
+        continue
+      }
+
+      if err := s.WriteJSON(&data); err != nil {
+        stop = true
         break
       }
 
-      switch data[0].(string) {
-      case "EVENT":
-        if _, ok := s.Sub_IDs[data[1].(string)]; !ok {
-          continue
-        }
-        if event := data[2].(map[string]interface{}); s.HasEvent(data[1].(string), event["id"].(string)) {
-          continue
-        }
+    case "EOSE":
+      if _, ok := s.Sub_IDs[data[1].(string)]; !ok {
+        continue
+      }
 
+      if _, ok := s.PendingEOSE[data[1].(string)]; !ok {
+        continue
+      }
+
+      s.PendingEOSE[data[1].(string)]++
+      if s.PendingEOSE[data[1].(string)] >= len(config.Relays) {
+        delete(s.PendingEOSE, data[1].(string))
         if err := s.WriteJSON(&data); err != nil {
           stop = true
           break
         }
-
-      case "EOSE":
-        if _, ok := s.Sub_IDs[data[1].(string)]; !ok {
-          continue
-        }
-
-        if _, ok := s.PendingEOSE[data[1].(string)]; !ok {
-          continue
-        }
-
-        s.PendingEOSE[data[1].(string)]++
-        if s.PendingEOSE[data[1].(string)] >= len(config.Relays) {
-          delete(s.PendingEOSE, data[1].(string))
-          if err := s.WriteJSON(&data); err != nil {
-            stop = true
-            break
-          }
-          continue
-        }
-      }
-
-      if stop {
-        break
+        continue
       }
     }
-  }()
+
+    if stop {
+      break
+    }
+  }
 }
 
 func (s *Session) StartConnect() {

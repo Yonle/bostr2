@@ -26,32 +26,31 @@ func Accept_Websocket (w http.ResponseWriter, r *http.Request) {
     Relays: []*websocket.Conn{},
   }
 
-  go func() {
-    sess.StartConnect()
+  sess.StartConnect()
 
-    defer conn.Close()
+  defer conn.Close()
 
-    for {
-      var json []interface{}
-      if err := conn.ReadJSON(&json); err != nil {
-        conn.WriteJSON([2]string{"NOTICE", fmt.Sprintf("ошибка: %s. отключение", err)})
-        break
-      }
+  for {
+    var json []interface{}
+    if err := conn.ReadJSON(&json); err != nil {
+      conn.WriteJSON([2]string{"NOTICE", fmt.Sprintf("ошибка: %s. отключение", err)})
+      break
+    }
 
-      switch json[0].(string) {
-      case "REQ":
-        sess.REQ(&json)
+    switch json[0].(string) {
+    case "REQ":
+       sess.REQ(&json)
+      sess.Broadcast(&json)
+    case "CLOSE":
+      sess.CLOSE(&json, true)
+      sess.Broadcast(&json)
+    case "EVENT":
+      if invalid := sess.EVENT(&json); !invalid {
+        conn.WriteJSON([2]string{"NOTICE", "Неверный объект."})
+      } else {
         sess.Broadcast(&json)
-      case "CLOSE":
-        sess.CLOSE(&json, true)
-        sess.Broadcast(&json)
-      case "EVENT":
-        if invalid := sess.EVENT(&json); !invalid {
-          conn.WriteJSON([2]string{"NOTICE", "Неверный объект."})
-        } else {
-          sess.Broadcast(&json)
-        }
       }
     }
-  }()
+
+  }
 }

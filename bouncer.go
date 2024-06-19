@@ -10,91 +10,72 @@ import (
 type SessionSubIDs map[string]*[]interface{}
 type SessionEventIDs map[string]map[string]struct{}
 type SessionPendingEOSE map[string]int
+type SessionRelays map[*websocket.Conn]struct{}
 
 type Session struct {
   Owner *websocket.Conn
   Sub_IDs SessionSubIDs
   Event_IDs SessionEventIDs
   PendingEOSE SessionPendingEOSE
-  Relays []*websocket.Conn
+  Relays SessionRelays
+  ready bool
+  destroyed bool
   mu sync.Mutex
+  rwm sync.RWMutex
 }
 
 var dialer = websocket.Dialer{}
-
-func (s *Session) Delete(index int) {
-  if index == 0 {
-    return
-  }
-
-  s.Relays[index] = s.Relays[len(s.Relays)-1]
-  s.Relays = s.Relays[:len(s.Relays)-1]
-}
 
 func (s *Session) Exist() bool {
   return s.Owner != nil
 }
 
 func (s *Session) NewConn(url string) {
-  var index int = 0
+  if s.destroyed {
+    return
+  }
 
   conn, resp, err := dialer.Dial(url, nil)
 
-  if !s.Exist() {
-    if err == nil {
+  if s.destroyed && conn != nil {
+    conn.Close()
+    return
+  }
+
+  if err != nil && !s.destroyed {
+    s.Reconnect(conn, &url)
+    return
+  }
+
+  if s.destroyed {
+    if conn != nil {
       conn.Close()
     }
     return
   }
 
-  if err != nil {
-    log.Printf("Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", url);
-
-    s.Delete(index)
-    go func() {
-      time.Sleep(5 * time.Second)
-      if !s.Exist() {
-        return
-      }
-
-      s.NewConn(url)
-    }()
-    return
-  }
-
   if resp.StatusCode >= 500 {
-    s.Delete(index)
-
-    go func() {
-      time.Sleep(5 * time.Second)
-      if !s.Exist() {
-        return
-      }
-
-      s.NewConn(url)
-    }()
+    s.Reconnect(conn, &url)
     return
   } else if resp.StatusCode > 101 {
     log.Printf("Получил неожиданный код статуса от %s (%s). Больше не подключаюсь.\n", url, resp.StatusCode)
     return
   }
 
-  index = len(s.Relays)
-
-  s.Relays = append(s.Relays, conn)
+  s.mu.Lock()
+  s.Relays[conn] = struct{}{}
+  s.mu.Unlock()
 
   log.Printf("%s присоединился к нам.\n", url)
 
   s.OpenSubscriptions(conn)
 
   var stop bool = false
-  defer conn.Close()
 
   for {
     var data []interface{}
     if err := conn.ReadJSON(&data); err != nil {
-      log.Printf("%s: Подделано!! Отключение\n", url)
-      break
+      return
     }
 
     switch data[0].(string) {
@@ -109,10 +90,12 @@ func (s *Session) NewConn(url string) {
 
       if err := s.WriteJSON(&data); err != nil {
         stop = true
-        break
+        return
       }
 
     case "EOSE":
+      s.rwm.Lock()
+      defer s.rwm.Unlock()
       if _, ok := s.Sub_IDs[data[1].(string)]; !ok {
         continue
       }
@@ -126,29 +109,51 @@ func (s *Session) NewConn(url string) {
         delete(s.PendingEOSE, data[1].(string))
         if err := s.WriteJSON(&data); err != nil {
           stop = true
-          break
+          return
         }
         continue
       }
     }
 
     if stop {
-      break
+      return
     }
   }
+
+  conn.Close()
+
+  if !stop {
+    s.Reconnect(conn, &url)
+  } else {
+    log.Printf("%s: Отключение\n", url)
+  }
+}
+
+func (s *Session) Reconnect(conn *websocket.Conn, url *string) {
+  log.Printf("Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", *url);
+
+  s.mu.Lock()
+  delete(s.Relays, conn)
+  s.mu.Unlock()
+
+  time.Sleep(5 * time.Second)
+  if s.destroyed {
+    return
+  }
+  go s.NewConn(*url)
 }
 
 func (s *Session) StartConnect() {
   for _, url := range config.Relays {
-    if !s.Exist() {
-      break;
+    if s.destroyed {
+      return;
     }
     go s.NewConn(url);
   }
 }
 
 func (s *Session) Broadcast(data *[]interface{}) {
-  for _, relay := range s.Relays {
+  for relay, _ := range s.Relays {
     relay.WriteJSON(data)
   }
 }
@@ -173,10 +178,13 @@ func (s *Session) CountEvents(subid string) int {
 func (s *Session) WriteJSON(data *[]interface{}) error {
   s.mu.Lock()
   defer s.mu.Unlock()
+
   return s.Owner.WriteJSON(data)
 }
 
 func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
+  s.mu.Lock()
+  defer s.mu.Unlock()
   for id, filters := range s.Sub_IDs {
     ReqData := []interface{}{"REQ", id}
     ReqData = append(ReqData, filters)
@@ -184,9 +192,29 @@ func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
   }
 }
 
+func (s *Session) Destroy(_ int, _ string) error {
+  s.destroyed = true
+
+  s.mu.Lock()
+  defer s.mu.Unlock()
+  for relay, _ := range s.Relays {
+    relay.Close()
+  }
+
+  return nil
+}
+
 func (s *Session) REQ(data *[]interface{}) {
+  if !s.ready {
+    s.StartConnect()
+    s.ready = true
+  }
+
   subid := (*data)[1].(string)
   filters := (*data)[2:]
+
+  s.mu.Lock()
+  defer s.mu.Unlock()
 
   s.CLOSE(data, false)
   s.Event_IDs[subid] = make(map[string]struct{})
@@ -195,6 +223,9 @@ func (s *Session) REQ(data *[]interface{}) {
 }
 
 func (s *Session) CLOSE(data *[]interface{}, sendClosed bool) {
+  s.rwm.Lock()
+  defer s.rwm.Unlock()
+
   subid := (*data)[1].(string)
 
   if _, ok := s.Event_IDs[subid]; ok {
@@ -215,6 +246,14 @@ func (s *Session) CLOSE(data *[]interface{}, sendClosed bool) {
 }
 
 func (s *Session) EVENT(data *[]interface{}) bool {
+  s.rwm.Lock()
+  defer s.rwm.Unlock()
+
+  if !s.ready {
+    s.StartConnect()
+    s.ready = true
+  }
+
   event := (*data)[1].(map[string]interface{})
   id, ok := event["id"]
   if ok {

@@ -23,23 +23,22 @@ func Accept_Websocket (w http.ResponseWriter, r *http.Request) {
     Sub_IDs: make(SessionSubIDs),
     Event_IDs: make(SessionEventIDs),
     PendingEOSE: make(SessionPendingEOSE),
-    Relays: []*websocket.Conn{},
+    Relays: make(SessionRelays),
   }
 
-  sess.StartConnect()
-
-  defer conn.Close()
+  conn.SetCloseHandler(sess.Destroy)
 
   for {
     var json []interface{}
     if err := conn.ReadJSON(&json); err != nil {
       conn.WriteJSON([2]string{"NOTICE", fmt.Sprintf("ошибка: %s. отключение", err)})
-      break
+      sess.Destroy(0, "")
+      return
     }
 
     switch json[0].(string) {
     case "REQ":
-       sess.REQ(&json)
+      sess.REQ(&json)
       sess.Broadcast(&json)
     case "CLOSE":
       sess.CLOSE(&json, true)

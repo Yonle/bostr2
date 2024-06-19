@@ -94,8 +94,8 @@ func (s *Session) NewConn(url string) {
       }
 
     case "EOSE":
-      s.rwm.Lock()
-      defer s.rwm.Unlock()
+      s.mu.Lock()
+      defer s.mu.Unlock()
       if _, ok := s.Sub_IDs[data[1].(string)]; !ok {
         continue
       }

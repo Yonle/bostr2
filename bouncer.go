@@ -7,7 +7,7 @@ import (
   "github.com/gorilla/websocket"
 )
 
-type SessionSubIDs map[string]struct{}
+type SessionSubIDs map[string]interface{}
 type SessionEventIDs map[string]map[string]struct{}
 type SessionPendingEOSE map[string]int
 
@@ -85,6 +85,8 @@ func (s *Session) NewConn(url string) {
 
   log.Printf("%s присоединился к нам.\n", url)
 
+  s.OpenSubscriptions(conn)
+
   var stop bool = false
   defer conn.Close()
 
@@ -152,7 +154,6 @@ func (s *Session) Broadcast(data *[]interface{}) {
 }
 
 func (s *Session) HasEvent(subid string, event_id string) bool {
-  // todo: do stuff
   events := s.Event_IDs[subid]
   _, ok := events[event_id]
 
@@ -163,19 +164,34 @@ func (s *Session) HasEvent(subid string, event_id string) bool {
   return ok
 }
 
+/*
+func (s *Session) CountEvents(subid string) int {
+  return len(s.Event_IDs[subid])
+}
+*/
+
 func (s *Session) WriteJSON(data *[]interface{}) error {
   s.mu.Lock()
   defer s.mu.Unlock()
   return s.Owner.WriteJSON(data)
 }
 
+func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
+  for id, filters := range s.Sub_IDs {
+    ReqData := []interface{}{"REQ", id}
+    ReqData = append(ReqData, filters)
+    conn.WriteJSON(&ReqData)
+  }
+}
+
 func (s *Session) REQ(data *[]interface{}) {
   subid := (*data)[1].(string)
+  filters := (*data)[2:]
 
   s.CLOSE(data, false)
   s.Event_IDs[subid] = make(map[string]struct{})
   s.PendingEOSE[subid] = 0
-  s.Sub_IDs[subid] = struct{}{};
+  s.Sub_IDs[subid] = filters;
 }
 
 func (s *Session) CLOSE(data *[]interface{}, sendClosed bool) {

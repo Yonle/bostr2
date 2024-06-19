@@ -19,8 +19,6 @@ func ShowInfo(w http.ResponseWriter, r *http.Request) {
     str += fmt.Sprintf("- %s\n", r)
   }
 
-  str += fmt.Sprintf("\nК этому вышибале у меня подключен %s клиент", len(bouncer))
-
   str += fmt.Sprintf("\nПодключитесь к ws://%s\n", r.Host)
 
   str += "\nPowered by blyat - https://github.com/Yonle/blyat"
@@ -65,7 +63,7 @@ func main() {
 
   ReadConfig(Config_Filename, &config)
 
-	http.HandleFunc("/", handleRequest)
+	go http.HandleFunc("/", handleRequest)
 
   log.Printf("Прослушивание на %s....\n", config.Listen)
 

@@ -26,13 +26,10 @@ func Accept_Websocket (w http.ResponseWriter, r *http.Request) {
     Relays: []*websocket.Conn{},
   }
 
-  bouncer[conn] = &sess
-
   go func() {
     sess.StartConnect()
 
     defer conn.Close()
-    defer delete(bouncer, conn)
 
     for {
       var json []interface{}

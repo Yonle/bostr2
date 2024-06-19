@@ -21,7 +21,6 @@ type Session struct {
 }
 
 var dialer = websocket.Dialer{}
-var bouncer = make(map[*websocket.Conn]*Session)
 
 func (s *Session) Delete(index int) {
   if index == 0 {
@@ -33,8 +32,7 @@ func (s *Session) Delete(index int) {
 }
 
 func (s *Session) Exist() bool {
-  _, exists := bouncer[s.Owner]
-  return exists
+  return s.Owner != nil
 }
 
 func (s *Session) NewConn(url string) {

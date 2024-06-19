@@ -7,7 +7,7 @@ import (
   "github.com/gorilla/websocket"
 )
 
-type SessionSubIDs map[string]interface{}
+type SessionSubIDs map[string]*[]interface{}
 type SessionEventIDs map[string]map[string]struct{}
 type SessionPendingEOSE map[string]int
 
@@ -191,7 +191,7 @@ func (s *Session) REQ(data *[]interface{}) {
   s.CLOSE(data, false)
   s.Event_IDs[subid] = make(map[string]struct{})
   s.PendingEOSE[subid] = 0
-  s.Sub_IDs[subid] = filters;
+  s.Sub_IDs[subid] = &filters;
 }
 
 func (s *Session) CLOSE(data *[]interface{}, sendClosed bool) {

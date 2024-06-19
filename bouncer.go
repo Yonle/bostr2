@@ -159,6 +159,9 @@ func (s *Session) Broadcast(data *[]interface{}) {
 }
 
 func (s *Session) HasEvent(subid string, event_id string) bool {
+  s.rwm.Lock()
+  defer s.rwm.Unlock()
+
   events := s.Event_IDs[subid]
   _, ok := events[event_id]
 
@@ -213,9 +216,6 @@ func (s *Session) REQ(data *[]interface{}) {
   subid := (*data)[1].(string)
   filters := (*data)[2:]
 
-  s.mu.Lock()
-  defer s.mu.Unlock()
-
   s.CLOSE(data, false)
   s.Event_IDs[subid] = make(map[string]struct{})
   s.PendingEOSE[subid] = 0
@@ -246,9 +246,6 @@ func (s *Session) CLOSE(data *[]interface{}, sendClosed bool) {
 }
 
 func (s *Session) EVENT(data *[]interface{}) bool {
-  s.rwm.Lock()
-  defer s.rwm.Unlock()
-
   if !s.ready {
     s.StartConnect()
     s.ready = true

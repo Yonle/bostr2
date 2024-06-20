@@ -21,7 +21,7 @@ type Session struct {
   ready bool
   destroyed bool
 
-  ownerWriteMu sync.RWMutex
+  ownerWriteMu sync.Mutex
   eventMu sync.Mutex
   eoseMu sync.Mutex
   relaysMu sync.Mutex

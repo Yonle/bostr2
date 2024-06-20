@@ -29,7 +29,7 @@ type Session struct {
 }
 
 var dialer = websocket.Dialer{
-  EnableCompression: true
+  EnableCompression: true,
 }
 
 func (s *Session) Exist() bool {

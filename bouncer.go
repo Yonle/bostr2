@@ -20,11 +20,12 @@ type Session struct {
   Relays SessionRelays
   ready bool
   destroyed bool
-  mu sync.Mutex
+
+  ownerWriteMu sync.RWMutex
   eventMu sync.Mutex
   eoseMu sync.Mutex
   relaysMu sync.Mutex
-  connWriteMu sync.Mutex
+  connWriteMu sync.RWMutex
 }
 
 var dialer = websocket.Dialer{}
@@ -126,6 +127,9 @@ func (s *Session) StartConnect() {
 }
 
 func (s *Session) Broadcast(data *[]interface{}) {
+  s.connWriteMu.Lock()
+  defer s.connWriteMu.Unlock()
+
   for relay, _ := range s.Relays {
     relay.WriteJSON(data)
   }
@@ -188,20 +192,21 @@ func (s *Session) CountEvents(subid string) int {
 */
 
 func (s *Session) WriteJSON(data *[]interface{}) error {
-  s.mu.Lock()
-  defer s.mu.Unlock()
+  s.ownerWriteMu.Lock()
+  defer s.ownerWriteMu.Unlock()
 
   return s.Owner.WriteJSON(data)
 }
 
 func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
+  s.connWriteMu.Lock()
+  defer s.connWriteMu.Unlock()
+
   for id, filters := range s.Sub_IDs {
     ReqData := []interface{}{"REQ", id}
     ReqData = append(ReqData, *filters...)
 
-    s.connWriteMu.Lock()
     conn.WriteJSON(&ReqData)
-    s.connWriteMu.Unlock()
   }
 }
 

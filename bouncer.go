@@ -22,6 +22,7 @@ type Session struct {
   destroyed bool
   mu sync.Mutex
   eventMu sync.RWMutex
+  eoseMu sync.Mutex
 }
 
 var dialer = websocket.Dialer{}
@@ -153,6 +154,9 @@ func (s *Session) HandleUpstreamEVENT(data []interface{}, stop *bool) {
 }
 
 func (s *Session) HandleUpstreamEOSE(data []interface{}, stop *bool) {
+  sync.eoseMu.Lock()
+  defer sync.eoseMu.Unlock()
+
   if _, ok := s.PendingEOSE[data[1].(string)]; !ok {
     return
   }

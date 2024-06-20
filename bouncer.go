@@ -154,8 +154,8 @@ func (s *Session) HandleUpstreamEVENT(data []interface{}, stop *bool) {
 }
 
 func (s *Session) HandleUpstreamEOSE(data []interface{}, stop *bool) {
-  sync.eoseMu.Lock()
-  defer sync.eoseMu.Unlock()
+  s.eoseMu.Lock()
+  defer s.eoseMu.Unlock()
 
   if _, ok := s.PendingEOSE[data[1].(string)]; !ok {
     return

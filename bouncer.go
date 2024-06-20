@@ -21,11 +21,11 @@ type Session struct {
   ready bool
   destroyed bool
 
-  ownerWriteMu sync.Mutex
+  ownerWriteMu sync.RWMutex
   eventMu sync.Mutex
   eoseMu sync.Mutex
   relaysMu sync.Mutex
-  connWriteMu sync.RWMutex
+  connWriteMu sync.Mutex
 }
 
 var dialer = websocket.Dialer{

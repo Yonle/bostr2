@@ -21,6 +21,7 @@ type Session struct {
   ready bool
   destroyed bool
   mu sync.Mutex
+  eventMu sync.RWMutex
 }
 
 var dialer = websocket.Dialer{}
@@ -128,7 +129,9 @@ func (s *Session) HasEvent(subid string, event_id string) bool {
   _, ok := events[event_id]
 
   if !ok {
+    s.eventMu.Lock()
     events[event_id] = struct{}{}
+    s.eventMu.Unlock()
   }
 
   return ok

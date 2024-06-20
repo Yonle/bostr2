@@ -134,7 +134,11 @@ func (s *Session) Broadcast(data *[]interface{}) {
 func (s *Session) HasEvent(subid string, event_id string) bool {
   s.eventMu.Lock()
   defer s.eventMu.Unlock()
-  events := s.Event_IDs[subid]
+  events, hasEventMap := s.Event_IDs[subid]
+  if !hasEventMap {
+    return true
+  }
+
   _, ok := events[event_id]
 
   if !ok {

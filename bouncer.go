@@ -25,7 +25,7 @@ type Session struct {
   eventMu sync.Mutex
   eoseMu sync.Mutex
   relaysMu sync.Mutex
-  connWriteMu sync.Mutex
+  connWriteMu sync.RWMutex
 }
 
 var dialer = websocket.Dialer{
@@ -129,11 +129,13 @@ func (s *Session) StartConnect() {
 }
 
 func (s *Session) Broadcast(data *[]interface{}) {
-  s.connWriteMu.Lock()
-  defer s.connWriteMu.Unlock()
+  s.relaysMu.Lock()
+  defer s.relaysMu.Unlock()
 
   for relay, _ := range s.Relays {
+    s.connWriteMu.Lock()
     relay.WriteJSON(data)
+    s.connWriteMu.Unlock()
   }
 }
 

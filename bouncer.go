@@ -24,6 +24,7 @@ type Session struct {
   eventMu sync.Mutex
   eoseMu sync.Mutex
   relaysMu sync.Mutex
+  connWriteMu sync.Mutex
 }
 
 var dialer = websocket.Dialer{}
@@ -194,7 +195,9 @@ func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
     ReqData := []interface{}{"REQ", id}
     ReqData = append(ReqData, *filters...)
 
+    s.connWriteMu.Lock()
     conn.WriteJSON(&ReqData)
+    s.connWriteMu.Unlock()
   }
 }
 

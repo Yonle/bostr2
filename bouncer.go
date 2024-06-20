@@ -21,7 +21,7 @@ type Session struct {
   ready bool
   destroyed bool
   mu sync.Mutex
-  eventMu sync.RWMutex
+  eventMu sync.Mutex
   eoseMu sync.Mutex
 }
 
@@ -126,13 +126,13 @@ func (s *Session) Broadcast(data *[]interface{}) {
 }
 
 func (s *Session) HasEvent(subid string, event_id string) bool {
+  s.eventMu.Lock()
+  defer s.eventMu.Unlock()
   events := s.Event_IDs[subid]
   _, ok := events[event_id]
 
   if !ok {
-    s.eventMu.Lock()
     events[event_id] = struct{}{}
-    s.eventMu.Unlock()
   }
 
   return ok

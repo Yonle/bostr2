@@ -23,6 +23,7 @@ type Session struct {
   mu sync.Mutex
   eventMu sync.Mutex
   eoseMu sync.Mutex
+  relaysMu sync.Mutex
 }
 
 var dialer = websocket.Dialer{}
@@ -63,7 +64,9 @@ func (s *Session) NewConn(url string) {
     return
   }
 
+  s.relaysMu.Lock()
   s.Relays[conn] = struct{}{}
+  s.relaysMu.Unlock()
 
   log.Printf("%s присоединился к нам.\n", url)
 
@@ -101,7 +104,9 @@ func (s *Session) NewConn(url string) {
 func (s *Session) Reconnect(conn *websocket.Conn, url *string) {
   log.Printf("Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", *url);
 
+  s.relaysMu.Lock()
   delete(s.Relays, conn)
+  s.relaysMu.Unlock()
 
   time.Sleep(5 * time.Second)
   if s.destroyed {

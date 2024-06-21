@@ -26,6 +26,7 @@ type Session struct {
   eoseMu sync.Mutex
   relaysMu sync.Mutex
   connWriteMu sync.RWMutex
+  subMu sync.Mutex
 }
 
 var dialer = websocket.Dialer{
@@ -157,9 +158,12 @@ func (s *Session) HasEvent(subid string, event_id string) bool {
 }
 
 func (s *Session) HandleUpstreamEVENT(data []interface{}, stop *bool) {
+  s.subMu.Lock()
   if _, ok := s.Sub_IDs[data[1].(string)]; !ok {
+    s.subMu.Unlock()
     return
   }
+  s.subMu.Unlock()
 
   if event := data[2].(map[string]interface{}); s.HasEvent(data[1].(string), event["id"].(string)) {
     return
@@ -234,24 +238,45 @@ func (s *Session) REQ(data *[]interface{}) {
   filters := (*data)[2:]
 
   s.CLOSE(data, false)
+
+  s.eventMu.Lock()
   s.Event_IDs[subid] = make(map[string]struct{})
+  s.eventMu.Unlock()
+
+  s.eoseMu.Lock()
   s.PendingEOSE[subid] = 0
+  s.eoseMu.Unlock()
+
+  s.subMu.Lock()
   s.Sub_IDs[subid] = &filters;
+  s.subMu.Unlock()
+
+  s.Broadcast(data)
 }
 
 func (s *Session) CLOSE(data *[]interface{}, sendClosed bool) {
   subid := (*data)[1].(string)
 
+  s.eventMu.Lock()
   delete(s.Event_IDs, subid)
+  s.eventMu.Unlock()
+
+  s.subMu.Lock()
   delete(s.Sub_IDs, subid)
+  s.subMu.Unlock()
+
+  s.eoseMu.Lock()
   delete(s.PendingEOSE, subid)
+  s.eoseMu.Unlock()
 
   if sendClosed {
     s.WriteJSON(&[]interface{}{"CLOSED", subid, ""})
   }
+
+  s.Broadcast(data)
 }
 
-func (s *Session) EVENT(data *[]interface{}) bool {
+func (s *Session) EVENT(data *[]interface{}) {
   if !s.ready {
     s.StartConnect()
     s.ready = true
@@ -259,9 +284,11 @@ func (s *Session) EVENT(data *[]interface{}) bool {
 
   event := (*data)[1].(map[string]interface{})
   id, ok := event["id"]
-  if ok {
-    s.WriteJSON(&[]interface{}{"OK", id, true, ""})
+  if !ok {
+    s.WriteJSON(&[]interface{}{"NOTICE", "Неверный объект."})
+    return
   }
 
-  return ok
+  s.WriteJSON(&[]interface{}{"OK", id, true, ""})
+  s.Broadcast(data)
 }

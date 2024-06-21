@@ -40,16 +40,10 @@ func Accept_Websocket (w http.ResponseWriter, r *http.Request) {
     switch json[0].(string) {
     case "REQ":
       sess.REQ(&json)
-      sess.Broadcast(&json)
     case "CLOSE":
       sess.CLOSE(&json, true)
-      sess.Broadcast(&json)
     case "EVENT":
-      if invalid := sess.EVENT(&json); !invalid {
-        conn.WriteJSON([2]string{"NOTICE", "Неверный объект."})
-      } else {
-        sess.Broadcast(&json)
-      }
+      sess.EVENT(&json)
     }
 
   }

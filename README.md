@@ -14,8 +14,8 @@ go install github.com/Yonle/blyat@latest
 listen: localhost:8080
 
 relays:
-- wss://nos.lol
-- wss://relay.damus.io
+- wss://relay.example1.com
+- wss://relay.example2.com
 
 nip_11:
   name: blyat
@@ -35,8 +35,6 @@ nip_11:
   - 22
   - 33
   - 40
-  - 42
-  - 50
 ```
 
 Сохраните файл конфигурации как config.yaml. После завершения вы можете запустить blyat с помощью следующей команды:

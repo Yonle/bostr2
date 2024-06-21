@@ -29,9 +29,7 @@ type Session struct {
   subMu sync.Mutex
 }
 
-var dialer = websocket.Dialer{
-  EnableCompression: true,
-}
+var dialer = websocket.Dialer{}
 
 func (s *Session) Exist() bool {
   return s.Owner != nil

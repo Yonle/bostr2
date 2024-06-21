@@ -9,7 +9,6 @@ import (
 var upgrader = websocket.Upgrader{
   ReadBufferSize:    1024,
   WriteBufferSize:   1024,
-  EnableCompression: true,
 }
 
 func Accept_Websocket (w http.ResponseWriter, r *http.Request) {

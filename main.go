@@ -19,7 +19,7 @@ func ShowInfo(w http.ResponseWriter, r *http.Request) {
     str += fmt.Sprintf("- %s\n", r)
   }
 
-  str += fmt.Sprintf("\nПодключитесь к ws://%s\n", r.Host)
+  str += fmt.Sprintf("\nПодключитесь к wss://%s или ws://%s (если не используете TLS)\n", r.Host, r.Host)
 
   str += "\nPowered by blyat - https://github.com/Yonle/blyat"
 

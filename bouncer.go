@@ -154,6 +154,15 @@ func (s *Session) HasEvent(subid string, event_id string) bool {
     events[event_id] = struct{}{}
   }
 
+  if len(events) > 500 {
+    s.eoseMu.Lock()
+    if _, ok := s.PendingEOSE[subid]; ok {
+      delete(s.PendingEOSE, subid)
+      s.WriteJSON(&[]interface{}{"EOSE", subid})
+    }
+    s.eoseMu.Unlock()
+  }
+
   return ok
 }
 

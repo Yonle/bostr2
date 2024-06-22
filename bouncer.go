@@ -229,14 +229,16 @@ func (s *Session) WriteJSON(data *[]interface{}) error {
 }
 
 func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
-  s.connWriteMu.Lock()
-  defer s.connWriteMu.Unlock()
+  s.subMu.Lock()
+  defer s.subMu.Unlock()
 
   for id, filters := range s.Sub_IDs {
     ReqData := []interface{}{"REQ", id}
     ReqData = append(ReqData, *filters...)
 
+    s.connWriteMu.Lock()
     conn.WriteJSON(&ReqData)
+    s.connWriteMu.Unlock()
   }
 }
 

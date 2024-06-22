@@ -4,6 +4,7 @@ import (
   "log"
   "time"
   "sync"
+  "net/http"
   "encoding/json"
   "github.com/gorilla/websocket"
 )
@@ -41,7 +42,10 @@ func (s *Session) NewConn(url string) {
     return
   }
 
-  conn, resp, err := dialer.Dial(url, nil)
+  connHeaders := make(http.Header)
+  connHeaders.Add("User-Agent", "Blyat; Nostr relay bouncer; https://github.com/Yonle/blyat")
+
+  conn, resp, err := dialer.Dial(url, connHeaders)
 
   if s.destroyed && conn != nil {
     conn.Close()

@@ -133,12 +133,14 @@ func (s *Session) StartConnect() {
 }
 
 func (s *Session) Broadcast(data *[]interface{}) {
+  JsonData, _ := json.Marshal(*data)
+
   s.relaysMu.Lock()
   defer s.relaysMu.Unlock()
 
   for relay := range s.Relays {
     s.connWriteMu.Lock()
-    relay.WriteJSON(data)
+    relay.WriteMessage(websocket.TextMessage, JsonData)
     s.connWriteMu.Unlock()
   }
 }
@@ -220,12 +222,12 @@ func (s *Session) CountEvents(subid string) int {
 */
 
 func (s *Session) WriteJSON(data *[]interface{}) error {
-  jsonStr, _ := json.Marshal(*data)
+  JsonData, _ := json.Marshal(*data)
 
   s.ownerWriteMu.Lock()
   defer s.ownerWriteMu.Unlock()
 
-  return s.Owner.WriteMessage(websocket.TextMessage, jsonStr)
+  return s.Owner.WriteMessage(websocket.TextMessage, JsonData)
 }
 
 func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
@@ -235,9 +237,10 @@ func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
   for id, filters := range s.Sub_IDs {
     ReqData := []interface{}{"REQ", id}
     ReqData = append(ReqData, *filters...)
+    JsonData, _ := json.Marshal(ReqData)
 
     s.connWriteMu.Lock()
-    conn.WriteJSON(&ReqData)
+    conn.WriteMessage(websocket.TextMessage, JsonData)
     s.connWriteMu.Unlock()
   }
 }

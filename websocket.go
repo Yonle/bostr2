@@ -31,7 +31,7 @@ func Accept_Websocket (w http.ResponseWriter, r *http.Request) {
   for {
     var json []interface{}
     if err := conn.ReadJSON(&json); err != nil {
-      conn.WriteJSON([2]string{"NOTICE", fmt.Sprintf("ошибка: %s. отключение", err)})
+      sess.WriteJSON(&[]interface{}{"NOTICE", fmt.Sprintf("ошибка: %s. отключение", err)})
       sess.Destroy(0, "")
       return
     }

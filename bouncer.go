@@ -4,6 +4,7 @@ import (
   "log"
   "time"
   "sync"
+  "encoding/json"
   "github.com/gorilla/websocket"
 )
 
@@ -219,10 +220,12 @@ func (s *Session) CountEvents(subid string) int {
 */
 
 func (s *Session) WriteJSON(data *[]interface{}) error {
+  jsonStr, _ := json.Marshal(*data)
+
   s.ownerWriteMu.Lock()
   defer s.ownerWriteMu.Unlock()
 
-  return s.Owner.WriteJSON(data)
+  return s.Owner.WriteMessage(websocket.TextMessage, jsonStr)
 }
 
 func (s *Session) OpenSubscriptions(conn *websocket.Conn) {

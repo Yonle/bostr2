@@ -23,7 +23,7 @@ func ShowInfo(w http.ResponseWriter, r *http.Request) {
 
   str += "\nPowered by blyat - https://github.com/Yonle/blyat"
 
-  fmt.Fprintf(w, str)
+  fmt.Fprint(w, str)
 }
 
 func ShowNIP11(w http.ResponseWriter) {

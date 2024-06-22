@@ -63,7 +63,7 @@ func (s *Session) NewConn(url string) {
     s.Reconnect(conn, &url)
     return
   } else if resp.StatusCode > 101 {
-    log.Printf("Получил неожиданный код статуса от %s (%s). Больше не подключаюсь.\n", url, resp.StatusCode)
+    log.Printf("Получил неожиданный код статуса от %s (%d). Больше не подключаюсь.\n", url, resp.StatusCode)
     return
   }
 
@@ -135,7 +135,7 @@ func (s *Session) Broadcast(data *[]interface{}) {
   s.relaysMu.Lock()
   defer s.relaysMu.Unlock()
 
-  for relay, _ := range s.Relays {
+  for relay := range s.Relays {
     s.connWriteMu.Lock()
     relay.WriteJSON(data)
     s.connWriteMu.Unlock()
@@ -240,7 +240,7 @@ func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
 func (s *Session) Destroy(_ int, _ string) error {
   s.destroyed = true
 
-  for relay, _ := range s.Relays {
+  for relay := range s.Relays {
     relay.Close()
   }
 

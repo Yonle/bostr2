@@ -58,7 +58,7 @@ func main() {
   flag.StringVar(&Config_Filename, "configfile", "config.yaml", "Путь к файлу конфигурации YAML")
   flag.Parse()
 
-  fmt.Println("СУКА БЛЯТЬ - bostr следующего поколения\n");
+  fmt.Println("СУКА БЛЯТЬ - bostr следующего поколения");
   log.Printf("Чтение %s в текущем каталоге....\n", Config_Filename)
 
   ReadConfig(Config_Filename, &config)

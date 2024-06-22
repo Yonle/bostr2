@@ -83,6 +83,10 @@ func (s *Session) NewConn(url string) {
       return
     }
 
+    if data == nil {
+      return
+    }
+
     switch data[0].(string) {
     case "EVENT":
       s.HandleUpstreamEVENT(data, &stop)
@@ -165,6 +169,10 @@ func (s *Session) HasEvent(subid string, event_id string) bool {
 }
 
 func (s *Session) HandleUpstreamEVENT(data []interface{}, stop *bool) {
+  if len(data) < 3 {
+    return
+  }
+
   s.subMu.Lock()
   if _, ok := s.Sub_IDs[data[1].(string)]; !ok {
     s.subMu.Unlock()
@@ -183,6 +191,10 @@ func (s *Session) HandleUpstreamEVENT(data []interface{}, stop *bool) {
 }
 
 func (s *Session) HandleUpstreamEOSE(data []interface{}, stop *bool) {
+  if len(data) < 2 {
+    return
+  }
+
   s.eoseMu.Lock()
   defer s.eoseMu.Unlock()
 

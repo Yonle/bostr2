@@ -89,11 +89,11 @@ func (s *Session) NewConn(url string) {
 	for {
 		var data []interface{}
 		if err := conn.ReadJSON(&data); err != nil {
-			return
+			break
 		}
 
 		if data == nil {
-			return
+			break
 		}
 
 		switch data[0].(string) {
@@ -127,7 +127,7 @@ func (s *Session) Reconnect(conn *websocket.Conn, url *string) {
 func (s *Session) StartConnect() {
 	for _, url := range config.Relays {
 		if s.destroyed {
-			return
+			break
 		}
 		go s.NewConn(url)
 	}
@@ -217,12 +217,6 @@ func (s *Session) CountEvents(subid string) int {
 */
 
 func (s *Session) WriteJSON(data *[]interface{}) {
-	defer func() {
-		if recover() != nil {
-			return
-		}
-	}()
-
 	JsonData, _ := json.Marshal(*data)
 
 	s.UpstreamMessage <- &JsonData

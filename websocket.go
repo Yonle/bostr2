@@ -29,14 +29,15 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request) {
 	}
 
 	go func() {
+	listener:
 		for {
 			select {
 			case msg := <-sess.UpstreamMessage:
 				if err := conn.WriteMessage(websocket.TextMessage, *msg); err != nil {
-					return
+					break listener
 				}
 			case <-sess.Done:
-				return
+				break listener
 			}
 		}
 	}()
@@ -47,7 +48,7 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request) {
 		var json []interface{}
 		if err := conn.ReadJSON(&json); err != nil {
 			sess.Destroy()
-			return
+			break
 		}
 
 		switch json[0].(string) {

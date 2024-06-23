@@ -215,6 +215,10 @@ func (s *Session) CountEvents(subid string) int {
 */
 
 func (s *Session) WriteJSON(data *[]interface{}) {
+  if s.destroyed {
+    return
+  }
+
   JsonData, _ := json.Marshal(*data)
 
   s.UpstreamMessage <- &JsonData
@@ -240,8 +244,10 @@ func (s *Session) Destroy(_ int, _ string) error {
 
   s.destroyed = true
 
+  s.relaysMu.Lock()
+  defer s.relaysMu.Unlock()
   for relay := range s.Relays {
-    relay.Close()
+    go relay.Close()
   }
 
   return nil

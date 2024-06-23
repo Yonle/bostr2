@@ -1,7 +1,6 @@
 package main
 
 import (
-  "fmt"
   "net/http"
 	"github.com/gorilla/websocket"
 )
@@ -33,16 +32,16 @@ func Accept_Websocket (w http.ResponseWriter, r *http.Request) {
   go func() {
     for msg := range sess.UpstreamMessage {
       if err := conn.WriteMessage(websocket.TextMessage, *msg); err != nil {
-        sess.Destroy(0, "")
         return
       }
     }
   }()
 
+  defer conn.Close()
+
   for {
     var json []interface{}
     if err := conn.ReadJSON(&json); err != nil {
-      sess.WriteJSON(&[]interface{}{"NOTICE", fmt.Sprintf("ошибка: %s. отключение", err)})
       sess.Destroy(0, "")
       return
     }

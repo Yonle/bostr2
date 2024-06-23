@@ -43,6 +43,7 @@ func Accept_Websocket (w http.ResponseWriter, r *http.Request) {
     var json []interface{}
     if err := conn.ReadJSON(&json); err != nil {
       sess.Destroy(0, "")
+      close(sess.UpstreamMessage)
       return
     }
 

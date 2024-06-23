@@ -215,10 +215,6 @@ func (s *Session) CountEvents(subid string) int {
 */
 
 func (s *Session) WriteJSON(data *[]interface{}) {
-  if s.destroyed {
-    return
-  }
-
   JsonData, _ := json.Marshal(*data)
 
   s.UpstreamMessage <- &JsonData
@@ -240,8 +236,6 @@ func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
 }
 
 func (s *Session) Destroy(_ int, _ string) error {
-  close(s.UpstreamMessage)
-
   s.destroyed = true
 
   s.relaysMu.Lock()

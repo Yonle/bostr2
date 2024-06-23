@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/goccy/go-yaml v1.11.3
-	github.com/gorilla/websocket v1.5.3
+	nhooyr.io/websocket v1.8.11
 )
 
 require (

@@ -1,29 +1,34 @@
 package main
 
 import (
-	"github.com/gorilla/websocket"
+	"context"
 	"net/http"
+	"nhooyr.io/websocket"
+	"nhooyr.io/websocket/wsjson"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin:     func(_ *http.Request) bool { return true },
-}
-
 func Accept_Websocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		InsecureSkipVerify: true,
+	})
 
 	if err != nil {
 		return
 	}
 
+	defer c.CloseNow()
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	defer cancel()
+
 	var sess = Session{
-		Owner:           conn,
-		Sub_IDs:         make(SessionSubIDs),
-		Event_IDs:       make(SessionEventIDs),
-		PendingEOSE:     make(SessionPendingEOSE),
-		Relays:          make(SessionRelays),
+		Sub_IDs:     make(SessionSubIDs),
+		Event_IDs:   make(SessionEventIDs),
+		PendingEOSE: make(SessionPendingEOSE),
+		Relays:      make(SessionRelays),
+		CancelZone:  make(SessionRelayCancelContext),
+
 		UpstreamMessage: make(SessionUpstreamMessage),
 		Done:            make(SessionDoneChannel),
 	}
@@ -33,7 +38,7 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request) {
 		for {
 			select {
 			case msg := <-sess.UpstreamMessage:
-				if err := conn.WriteMessage(websocket.TextMessage, *msg); err != nil {
+				if err := wsjson.Write(ctx, c, *msg); err != nil {
 					break listener
 				}
 			case <-sess.Done:
@@ -42,12 +47,12 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request) {
 		}
 	}()
 
-	defer conn.Close()
+	defer sess.Destroy()
+	defer c.Close(websocket.StatusUnsupportedData, "Данные не в формате JSON")
 
 	for {
 		var json []interface{}
-		if err := conn.ReadJSON(&json); err != nil {
-			sess.Destroy()
+		if err := wsjson.Read(ctx, c, &json); err != nil {
 			break
 		}
 
@@ -59,6 +64,5 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request) {
 		case "EVENT":
 			sess.EVENT(&json)
 		}
-
 	}
 }

@@ -1,10 +1,11 @@
 package main
 
 import (
-	"encoding/json"
-	"github.com/gorilla/websocket"
+	"context"
 	"log"
 	"net/http"
+	"nhooyr.io/websocket"
+	"nhooyr.io/websocket/wsjson"
 	"sync"
 	"time"
 )
@@ -12,16 +13,18 @@ import (
 type SessionSubIDs map[string]*[]interface{}
 type SessionEventIDs map[string]map[string]struct{}
 type SessionPendingEOSE map[string]int
-type SessionRelays map[*websocket.Conn]struct{}
-type SessionUpstreamMessage chan *[]byte
+type SessionRelays map[*websocket.Conn]context.Context
+type SessionUpstreamMessage chan *[]interface{}
 type SessionDoneChannel chan struct{}
+type SessionRelayCancelContext map[context.Context]context.CancelFunc
 
 type Session struct {
-	Owner           *websocket.Conn
-	Sub_IDs         SessionSubIDs
-	Event_IDs       SessionEventIDs
-	PendingEOSE     SessionPendingEOSE
-	Relays          SessionRelays
+	Sub_IDs     SessionSubIDs
+	Event_IDs   SessionEventIDs
+	PendingEOSE SessionPendingEOSE
+	Relays      SessionRelays
+	CancelZone  SessionRelayCancelContext
+
 	UpstreamMessage SessionUpstreamMessage
 	Done            SessionDoneChannel
 	ready           bool
@@ -32,12 +35,7 @@ type Session struct {
 	relaysMu    sync.Mutex
 	connWriteMu sync.Mutex
 	subMu       sync.Mutex
-}
-
-var dialer = websocket.Dialer{}
-
-func (s *Session) Exist() bool {
-	return s.Owner != nil
+	cancelMu    sync.Mutex
 }
 
 func (s *Session) NewConn(url string) {
@@ -45,27 +43,35 @@ func (s *Session) NewConn(url string) {
 		return
 	}
 
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+
+	defer cancel()
+
+	s.cancelMu.Lock()
+	s.CancelZone[ctx] = cancel
+	s.cancelMu.Unlock()
+
 	connHeaders := make(http.Header)
 	connHeaders.Add("User-Agent", "Blyat; Nostr relay bouncer; https://github.com/Yonle/blyat")
 
-	conn, resp, err := dialer.Dial(url, connHeaders)
+	conn, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{
+		HTTPHeader: connHeaders,
+	})
 
-	if s.destroyed && conn != nil {
-		conn.Close()
+	s.cancelMu.Lock()
+	delete(s.CancelZone, ctx)
+	s.cancelMu.Unlock()
+
+	if s.destroyed && err != nil {
 		return
 	}
 
-	if err != nil && !s.destroyed {
+	if err != nil {
 		s.Reconnect(conn, &url)
 		return
 	}
 
-	if s.destroyed {
-		if conn != nil {
-			conn.Close()
-		}
-		return
-	}
+	defer conn.CloseNow()
 
 	if resp.StatusCode >= 500 {
 		s.Reconnect(conn, &url)
@@ -76,19 +82,19 @@ func (s *Session) NewConn(url string) {
 	}
 
 	s.relaysMu.Lock()
-	s.Relays[conn] = struct{}{}
+	s.Relays[conn] = ctx
 	s.relaysMu.Unlock()
 
 	log.Printf("%s присоединился к нам.\n", url)
 
-	s.OpenSubscriptions(conn)
+	s.OpenSubscriptions(ctx, conn)
 
 	defer s.Reconnect(conn, &url)
-	defer conn.Close()
+	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	for {
 		var data []interface{}
-		if err := conn.ReadJSON(&data); err != nil {
+		if err := wsjson.Read(ctx, conn, &data); err != nil {
 			break
 		}
 
@@ -134,14 +140,12 @@ func (s *Session) StartConnect() {
 }
 
 func (s *Session) Broadcast(data *[]interface{}) {
-	JsonData, _ := json.Marshal(*data)
-
 	s.relaysMu.Lock()
 	defer s.relaysMu.Unlock()
 
-	for relay := range s.Relays {
+	for relay, ctx := range s.Relays {
 		s.connWriteMu.Lock()
-		relay.WriteMessage(websocket.TextMessage, JsonData)
+		wsjson.Write(ctx, relay, data)
 		s.connWriteMu.Unlock()
 	}
 }
@@ -217,22 +221,19 @@ func (s *Session) CountEvents(subid string) int {
 */
 
 func (s *Session) WriteJSON(data *[]interface{}) {
-	JsonData, _ := json.Marshal(*data)
-
-	s.UpstreamMessage <- &JsonData
+	s.UpstreamMessage <- data
 }
 
-func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
+func (s *Session) OpenSubscriptions(ctx context.Context, conn *websocket.Conn) {
 	s.subMu.Lock()
 	defer s.subMu.Unlock()
 
 	for id, filters := range s.Sub_IDs {
 		ReqData := []interface{}{"REQ", id}
 		ReqData = append(ReqData, *filters...)
-		JsonData, _ := json.Marshal(ReqData)
 
 		s.connWriteMu.Lock()
-		conn.WriteMessage(websocket.TextMessage, JsonData)
+		wsjson.Write(ctx, conn, ReqData)
 		s.connWriteMu.Unlock()
 	}
 }
@@ -240,9 +241,15 @@ func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
 func (s *Session) Destroy() {
 	s.destroyed = true
 
+	s.cancelMu.Lock()
+	for _, cancel := range s.CancelZone {
+		cancel()
+	}
+	s.cancelMu.Unlock()
+
 	s.relaysMu.Lock()
 	for relay := range s.Relays {
-		go relay.Close()
+		go relay.Close(websocket.StatusNormalClosure, "")
 	}
 	s.relaysMu.Unlock()
 

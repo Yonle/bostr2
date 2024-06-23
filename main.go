@@ -1,73 +1,73 @@
 package main
 
 import (
-  "fmt"
+	"encoding/json"
+	"flag"
+	"fmt"
 	"log"
-  "flag"
-  "strings"
 	"net/http"
-  "encoding/json"
+	"strings"
 )
 
 var config Config
 var Config_Filename string
 
 func ShowInfo(w http.ResponseWriter, r *http.Request) {
-  str := "СУКА БЛЯТЬ - bostr следующего поколения\n\n"
+	str := "СУКА БЛЯТЬ - bostr следующего поколения\n\n"
 
-  for _, r := range config.Relays {
-    str += fmt.Sprintf("- %s\n", r)
-  }
+	for _, r := range config.Relays {
+		str += fmt.Sprintf("- %s\n", r)
+	}
 
-  str += fmt.Sprintf("\nПодключитесь к wss://%s или ws://%s (если не используете TLS)\n", r.Host, r.Host)
+	str += fmt.Sprintf("\nПодключитесь к wss://%s или ws://%s (если не используете TLS)\n", r.Host, r.Host)
 
-  str += "\nPowered by blyat - https://github.com/Yonle/blyat"
+	str += "\nPowered by blyat - https://github.com/Yonle/blyat"
 
-  fmt.Fprint(w, str)
+	fmt.Fprint(w, str)
 }
 
 func ShowNIP11(w http.ResponseWriter) {
-  d, err := json.Marshal(config.NIP_11)
+	d, err := json.Marshal(config.NIP_11)
 
-  var header = w.Header()
-  header.Set("Content-Type", "application/json")
-  header.Set("Access-Control-Allow-Origin", "*")
+	var header = w.Header()
+	header.Set("Content-Type", "application/json")
+	header.Set("Access-Control-Allow-Origin", "*")
 
-  if err != nil {
-    fmt.Fprintf(w, "{}")
-    return
-  }
+	if err != nil {
+		fmt.Fprintf(w, "{}")
+		return
+	}
 
-  w.Write(d);
+	w.Write(d)
 }
 
 func handleRequest(w http.ResponseWriter, r *http.Request) {
 	if r.Method == http.MethodGet && r.Header.Get("Upgrade") == "websocket" {
 		Accept_Websocket(w, r)
-  } else {
-    accept := r.Header.Get("Accept")
-    if strings.Contains(accept, "application/nostr+json") {
-      ShowNIP11(w)
+	} else {
+		accept := r.Header.Get("Accept")
+		if strings.Contains(accept, "application/nostr+json") {
+			ShowNIP11(w)
 		} else {
-      ShowInfo(w, r)
-    }
+			ShowInfo(w, r)
+		}
 	}
 }
 
 func main() {
-  flag.StringVar(&Config_Filename, "configfile", "config.yaml", "Путь к файлу конфигурации YAML")
-  flag.Parse()
+	flag.StringVar(&Config_Filename, "configfile", "config.yaml", "Путь к файлу конфигурации YAML")
+	flag.Parse()
 
-  fmt.Println("СУКА БЛЯТЬ - bostr следующего поколения");
-  log.Printf("Чтение %s в текущем каталоге....\n", Config_Filename)
+	fmt.Println("СУКА БЛЯТЬ - bostr следующего поколения")
+	log.Printf("Чтение %s в текущем каталоге....\n", Config_Filename)
 
-  ReadConfig(Config_Filename, &config)
+	ReadConfig(Config_Filename, &config)
 
 	go http.HandleFunc("/", handleRequest)
 
-  log.Printf("Прослушивание на %s....\n", config.Listen)
+	log.Printf("Прослушивание на %s....\n", config.Listen)
 
 	if err := http.ListenAndServe(config.Listen, nil); err != nil {
-   	panic(err)
-  }
+		panic(err)
+	}
 }

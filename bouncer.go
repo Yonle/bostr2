@@ -13,6 +13,7 @@ type SessionSubIDs map[string]*[]interface{}
 type SessionEventIDs map[string]map[string]struct{}
 type SessionPendingEOSE map[string]int
 type SessionRelays map[*websocket.Conn]struct{}
+type SessionUpstreamMessage chan *[]byte
 
 type Session struct {
   Owner *websocket.Conn
@@ -20,10 +21,10 @@ type Session struct {
   Event_IDs SessionEventIDs
   PendingEOSE SessionPendingEOSE
   Relays SessionRelays
+  UpstreamMessage SessionUpstreamMessage
   ready bool
   destroyed bool
 
-  ownerWriteMu sync.Mutex
   eventMu sync.Mutex
   eoseMu sync.Mutex
   relaysMu sync.Mutex
@@ -80,8 +81,6 @@ func (s *Session) NewConn(url string) {
 
   s.OpenSubscriptions(conn)
 
-  var stop bool = false
-
   for {
     var data []interface{}
     if err := conn.ReadJSON(&data); err != nil {
@@ -94,19 +93,15 @@ func (s *Session) NewConn(url string) {
 
     switch data[0].(string) {
     case "EVENT":
-      s.HandleUpstreamEVENT(data, &stop)
+      s.HandleUpstreamEVENT(data)
     case "EOSE":
-      s.HandleUpstreamEOSE(data, &stop)
-    }
-
-    if stop {
-      return
+      s.HandleUpstreamEOSE(data)
     }
   }
 
   conn.Close()
 
-  if !stop {
+  if !s.destroyed {
     s.Reconnect(conn, &url)
   } else {
     log.Printf("%s: Отключение\n", url)
@@ -175,7 +170,7 @@ func (s *Session) HasEvent(subid string, event_id string) bool {
   return ok
 }
 
-func (s *Session) HandleUpstreamEVENT(data []interface{}, stop *bool) {
+func (s *Session) HandleUpstreamEVENT(data []interface{}) {
   if len(data) < 3 {
     return
   }
@@ -191,13 +186,10 @@ func (s *Session) HandleUpstreamEVENT(data []interface{}, stop *bool) {
     return
   }
 
-  if err := s.WriteJSON(&data); err != nil {
-    *stop = true
-    return
-  }
+  s.WriteJSON(&data)
 }
 
-func (s *Session) HandleUpstreamEOSE(data []interface{}, stop *bool) {
+func (s *Session) HandleUpstreamEOSE(data []interface{}) {
   if len(data) < 2 {
     return
   }
@@ -212,10 +204,7 @@ func (s *Session) HandleUpstreamEOSE(data []interface{}, stop *bool) {
   s.PendingEOSE[data[1].(string)]++
   if s.PendingEOSE[data[1].(string)] >= len(config.Relays) {
     delete(s.PendingEOSE, data[1].(string))
-    if err := s.WriteJSON(&data); err != nil {
-      *stop = true
-      return
-    }
+    s.WriteJSON(&data)
   }
 }
 
@@ -225,13 +214,10 @@ func (s *Session) CountEvents(subid string) int {
 }
 */
 
-func (s *Session) WriteJSON(data *[]interface{}) error {
+func (s *Session) WriteJSON(data *[]interface{}) {
   JsonData, _ := json.Marshal(*data)
 
-  s.ownerWriteMu.Lock()
-  defer s.ownerWriteMu.Unlock()
-
-  return s.Owner.WriteMessage(websocket.TextMessage, JsonData)
+  s.UpstreamMessage <- &JsonData
 }
 
 func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
@@ -250,6 +236,8 @@ func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
 }
 
 func (s *Session) Destroy(_ int, _ string) error {
+  close(s.UpstreamMessage)
+
   s.destroyed = true
 
   for relay := range s.Relays {

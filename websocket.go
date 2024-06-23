@@ -25,9 +25,19 @@ func Accept_Websocket (w http.ResponseWriter, r *http.Request) {
     Event_IDs: make(SessionEventIDs),
     PendingEOSE: make(SessionPendingEOSE),
     Relays: make(SessionRelays),
+    UpstreamMessage: make(SessionUpstreamMessage),
   }
 
   conn.SetCloseHandler(sess.Destroy)
+
+  go func() {
+    for msg := range sess.UpstreamMessage {
+      if err := conn.WriteMessage(websocket.TextMessage, *msg); err != nil {
+        sess.Destroy(0, "")
+        return
+      }
+    }
+  }()
 
   for {
     var json []interface{}

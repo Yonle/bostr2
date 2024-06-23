@@ -215,6 +215,12 @@ func (s *Session) CountEvents(subid string) int {
 */
 
 func (s *Session) WriteJSON(data *[]interface{}) {
+  defer func() {
+    if recover() != nil {
+      return
+    }
+  }()
+
   JsonData, _ := json.Marshal(*data)
 
   s.UpstreamMessage <- &JsonData

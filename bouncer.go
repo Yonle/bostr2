@@ -14,6 +14,7 @@ type SessionEventIDs map[string]map[string]struct{}
 type SessionPendingEOSE map[string]int
 type SessionRelays map[*websocket.Conn]struct{}
 type SessionUpstreamMessage chan *[]byte
+type SessionDoneChannel chan struct{}
 
 type Session struct {
   Owner *websocket.Conn
@@ -22,6 +23,7 @@ type Session struct {
   PendingEOSE SessionPendingEOSE
   Relays SessionRelays
   UpstreamMessage SessionUpstreamMessage
+  Done SessionDoneChannel
   ready bool
   destroyed bool
 
@@ -81,6 +83,9 @@ func (s *Session) NewConn(url string) {
 
   s.OpenSubscriptions(conn)
 
+  defer s.Reconnect(conn, &url)
+  defer conn.Close()
+
   for {
     var data []interface{}
     if err := conn.ReadJSON(&data); err != nil {
@@ -98,17 +103,14 @@ func (s *Session) NewConn(url string) {
       s.HandleUpstreamEOSE(data)
     }
   }
-
-  conn.Close()
-
-  if !s.destroyed {
-    s.Reconnect(conn, &url)
-  } else {
-    log.Printf("%s: Отключение\n", url)
-  }
 }
 
 func (s *Session) Reconnect(conn *websocket.Conn, url *string) {
+  if s.destroyed {
+    log.Printf("%s: Отключение\n", *url)
+    return
+  }
+
   log.Printf("Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", *url);
 
   s.relaysMu.Lock()
@@ -241,16 +243,16 @@ func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
   }
 }
 
-func (s *Session) Destroy(_ int, _ string) error {
+func (s *Session) Destroy() {
   s.destroyed = true
 
   s.relaysMu.Lock()
-  defer s.relaysMu.Unlock()
   for relay := range s.Relays {
     go relay.Close()
   }
+  s.relaysMu.Unlock()
 
-  return nil
+  s.Done<-struct{}{}
 }
 
 func (s *Session) REQ(data *[]interface{}) {

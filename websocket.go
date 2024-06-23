@@ -25,13 +25,17 @@ func Accept_Websocket (w http.ResponseWriter, r *http.Request) {
     PendingEOSE: make(SessionPendingEOSE),
     Relays: make(SessionRelays),
     UpstreamMessage: make(SessionUpstreamMessage),
+    Done: make(SessionDoneChannel),
   }
 
-  conn.SetCloseHandler(sess.Destroy)
-
   go func() {
-    for msg := range sess.UpstreamMessage {
-      if err := conn.WriteMessage(websocket.TextMessage, *msg); err != nil {
+    for {
+      select {
+      case msg := <-sess.UpstreamMessage:
+        if err := conn.WriteMessage(websocket.TextMessage, *msg); err != nil {
+          return
+        }
+      case <-sess.Done:
         return
       }
     }
@@ -42,8 +46,7 @@ func Accept_Websocket (w http.ResponseWriter, r *http.Request) {
   for {
     var json []interface{}
     if err := conn.ReadJSON(&json); err != nil {
-      sess.Destroy(0, "")
-      close(sess.UpstreamMessage)
+      sess.Destroy()
       return
     }
 

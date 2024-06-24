@@ -49,8 +49,6 @@ loop:
 
 		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 
-		defer cancel()
-
 		s.cancelMu.Lock()
 		s.CancelZone[ctx] = cancel
 		s.cancelMu.Unlock()
@@ -68,23 +66,27 @@ loop:
 		s.cancelMu.Unlock()
 
 		if s.destroyed && err == nil {
+			cancel()
 			conn.CloseNow()
 			return
 		}
 
 		if err != nil {
+			cancel()
 			log.Printf("%s Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", s.ClientIP, url)
 			time.Sleep(5 * time.Second)
 			continue loop
 		}
 
-		defer conn.CloseNow()
-
 		if resp.StatusCode >= 500 {
+			cancel()
+			conn.CloseNow()
 			log.Printf("%s Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", s.ClientIP, url)
 			time.Sleep(5 * time.Second)
 			continue loop
 		} else if resp.StatusCode > 101 {
+			cancel()
+			conn.CloseNow()
 			log.Printf("%s Получил неожиданный код статуса от %s (%d). Больше не подключаюсь.\n", s.ClientIP, url, resp.StatusCode)
 			return
 		}
@@ -115,7 +117,8 @@ loop:
 			}
 		}
 
-		conn.Close(websocket.StatusNormalClosure, "")
+		conn.CloseNow()
+		cancel()
 
 		if s.destroyed {
 			log.Printf("%s %s: Отключение\n", s.ClientIP, url)

@@ -91,7 +91,7 @@ loop:
 		s.Relays[conn] = struct{}{}
 		s.relaysMu.Unlock()
 
-		s.OpenSubscriptions(ctx, conn)
+		s.OpenSubscriptions(conn)
 
 		for {
 			var data []interface{}

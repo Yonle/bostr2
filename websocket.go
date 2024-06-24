@@ -64,8 +64,6 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 		cmd := json[0].(string)
 
-		log.Println(ip, cmd)
-
 		switch cmd {
 		case "REQ":
 			sess.REQ(&json)

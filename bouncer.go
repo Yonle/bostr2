@@ -57,7 +57,6 @@ loop:
 
 		conn, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{
 			HTTPHeader:      connHeaders,
-			CompressionMode: websocket.CompressionContextTakeover,
 		})
 
 		s.cancelMu.Lock()
@@ -213,12 +212,6 @@ func (s *Session) HandleUpstreamEOSE(data []interface{}) {
 		s.WriteJSON(&data)
 	}
 }
-
-/*
-func (s *Session) CountEvents(subid string) int {
-  return len(s.Event_IDs[subid])
-}
-*/
 
 func (s *Session) WriteJSON(data *[]interface{}) {
 	s.UpstreamMessage <- data

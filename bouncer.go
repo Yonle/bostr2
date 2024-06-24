@@ -13,7 +13,7 @@ import (
 type SessionSubIDs map[string]*[]interface{}
 type SessionEventIDs map[string]map[string]struct{}
 type SessionPendingEOSE map[string]int
-type SessionRelays map[*websocket.Conn]context.Context
+type SessionRelays map[*websocket.Conn]struct{}
 type SessionUpstreamMessage chan *[]interface{}
 type SessionDoneChannel chan struct{}
 type SessionRelayCancelContext map[context.Context]context.CancelFunc
@@ -32,12 +32,11 @@ type Session struct {
 	ready           bool
 	destroyed       bool
 
-	eventMu     sync.Mutex
-	eoseMu      sync.Mutex
-	relaysMu    sync.Mutex
-	connWriteMu sync.Mutex
-	subMu       sync.Mutex
-	cancelMu    sync.Mutex
+	eventMu  sync.Mutex
+	eoseMu   sync.Mutex
+	relaysMu sync.Mutex
+	subMu    sync.Mutex
+	cancelMu sync.Mutex
 }
 
 func (s *Session) NewConn(url string) {
@@ -92,7 +91,7 @@ loop:
 		}
 
 		s.relaysMu.Lock()
-		s.Relays[conn] = ctx
+		s.Relays[conn] = struct{}{}
 		s.relaysMu.Unlock()
 
 		log.Printf("%s %s связанный\n", s.ClientIP, url)
@@ -153,10 +152,9 @@ func (s *Session) Broadcast(data *[]interface{}) {
 	s.relaysMu.Lock()
 	defer s.relaysMu.Unlock()
 
-	for relay, ctx := range s.Relays {
-		s.connWriteMu.Lock()
+	for relay := range s.Relays {
+		ctx := context.Background()
 		wsjson.Write(ctx, relay, data)
-		s.connWriteMu.Unlock()
 	}
 }
 
@@ -234,7 +232,7 @@ func (s *Session) WriteJSON(data *[]interface{}) {
 	s.UpstreamMessage <- data
 }
 
-func (s *Session) OpenSubscriptions(ctx context.Context, conn *websocket.Conn) {
+func (s *Session) OpenSubscriptions(conn *websocket.Conn) {
 	s.subMu.Lock()
 	defer s.subMu.Unlock()
 
@@ -242,9 +240,8 @@ func (s *Session) OpenSubscriptions(ctx context.Context, conn *websocket.Conn) {
 		ReqData := []interface{}{"REQ", id}
 		ReqData = append(ReqData, *filters...)
 
-		s.connWriteMu.Lock()
+		ctx := context.Background()
 		wsjson.Write(ctx, conn, ReqData)
-		s.connWriteMu.Unlock()
 	}
 }
 

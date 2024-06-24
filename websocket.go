@@ -26,7 +26,7 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 	log.Printf("%s связанный (%s)", ip, ua)
 
-	var sess = Session{
+	var sess = &Session{
 		ClientIP:    ip,
 		Sub_IDs:     make(SessionSubIDs),
 		Event_IDs:   make(SessionEventIDs),

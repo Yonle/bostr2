@@ -19,6 +19,8 @@ type SessionDoneChannel chan struct{}
 type SessionRelayCancelContext map[context.Context]context.CancelFunc
 
 type Session struct {
+	ClientIP string
+
 	Sub_IDs     SessionSubIDs
 	Event_IDs   SessionEventIDs
 	PendingEOSE SessionPendingEOSE
@@ -78,7 +80,7 @@ func (s *Session) NewConn(url string) {
 		s.Reconnect(conn, &url)
 		return
 	} else if resp.StatusCode > 101 {
-		log.Printf("Получил неожиданный код статуса от %s (%d). Больше не подключаюсь.\n", url, resp.StatusCode)
+		log.Printf("%s Получил неожиданный код статуса от %s (%d). Больше не подключаюсь.\n", s.ClientIP, url, resp.StatusCode)
 		return
 	}
 
@@ -86,7 +88,7 @@ func (s *Session) NewConn(url string) {
 	s.Relays[conn] = ctx
 	s.relaysMu.Unlock()
 
-	log.Printf("%s присоединился к нам.\n", url)
+	log.Printf("%s %s связанный\n", s.ClientIP, url)
 
 	s.OpenSubscriptions(ctx, conn)
 
@@ -114,11 +116,11 @@ func (s *Session) NewConn(url string) {
 
 func (s *Session) Reconnect(conn *websocket.Conn, url *string) {
 	if s.destroyed {
-		log.Printf("%s: Отключение\n", *url)
+		log.Printf("%s %s: Отключение\n", s.ClientIP, *url)
 		return
 	}
 
-	log.Printf("Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", *url)
+	log.Printf("%s Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", s.ClientIP, *url)
 
 	s.relaysMu.Lock()
 	delete(s.Relays, conn)
@@ -128,10 +130,12 @@ func (s *Session) Reconnect(conn *websocket.Conn, url *string) {
 	if s.destroyed {
 		return
 	}
-	go s.NewConn(*url)
+
+	s.NewConn(*url)
 }
 
 func (s *Session) StartConnect() {
+	log.Println(s.ClientIP, "Начало сеанса....")
 	for _, url := range config.Relays {
 		if s.destroyed {
 			break
@@ -250,7 +254,7 @@ func (s *Session) Destroy() {
 
 	s.relaysMu.Lock()
 	for relay := range s.Relays {
-		go relay.Close(websocket.StatusNormalClosure, "")
+		relay.CloseNow()
 	}
 	s.relaysMu.Unlock()
 

@@ -42,8 +42,16 @@ func ShowNIP11(w http.ResponseWriter) {
 }
 
 func handleRequest(w http.ResponseWriter, r *http.Request) {
+	xff := r.Header.Get("X-Forwarded-For")
+	ip := strings.Split(xff, ",")[0]
+
+	if len(ip) < 1 {
+		ip = r.RemoteAddr
+	}
+
+	log.Println(ip, r.Method, r.URL)
 	if r.Method == http.MethodGet && r.Header.Get("Upgrade") == "websocket" {
-		Accept_Websocket(w, r)
+		Accept_Websocket(w, r, ip)
 	} else {
 		accept := r.Header.Get("Accept")
 		if strings.Contains(accept, "application/nostr+json") {

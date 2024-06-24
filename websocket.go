@@ -2,12 +2,13 @@ package main
 
 import (
 	"context"
+	"log"
 	"net/http"
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
 )
 
-func Accept_Websocket(w http.ResponseWriter, r *http.Request) {
+func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string) {
 	c, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		InsecureSkipVerify: true,
 		CompressionMode:    websocket.CompressionContextTakeover,
@@ -23,7 +24,10 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request) {
 
 	defer cancel()
 
+	log.Println(ip, "связанный")
+
 	var sess = Session{
+		ClientIP:    ip,
 		Sub_IDs:     make(SessionSubIDs),
 		Event_IDs:   make(SessionEventIDs),
 		PendingEOSE: make(SessionPendingEOSE),
@@ -49,6 +53,7 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request) {
 	}()
 
 	defer sess.Destroy()
+	defer log.Println(ip, "отключен.")
 	defer c.Close(websocket.StatusUnsupportedData, "Данные не в формате JSON")
 
 	for {
@@ -57,7 +62,11 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request) {
 			break
 		}
 
-		switch json[0].(string) {
+		cmd := json[0].(string)
+
+		log.Println(ip, cmd)
+
+		switch cmd {
 		case "REQ":
 			sess.REQ(&json)
 		case "CLOSE":

@@ -41,97 +41,95 @@ type Session struct {
 }
 
 func (s *Session) NewConn(url string) {
-	if s.destroyed {
-		return
-	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-
-	defer cancel()
-
-	s.cancelMu.Lock()
-	s.CancelZone[ctx] = cancel
-	s.cancelMu.Unlock()
-
-	connHeaders := make(http.Header)
-	connHeaders.Add("User-Agent", "Blyat; Nostr relay bouncer; https://github.com/Yonle/blyat")
-
-	conn, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{
-		HTTPHeader:      connHeaders,
-		CompressionMode: websocket.CompressionContextTakeover,
-	})
-
-	s.cancelMu.Lock()
-	delete(s.CancelZone, ctx)
-	s.cancelMu.Unlock()
-
-	if s.destroyed && err != nil {
-		return
-	}
-
-	if err != nil {
-		s.Reconnect(conn, &url)
-		return
-	}
-
-	defer conn.CloseNow()
-
-	if resp.StatusCode >= 500 {
-		s.Reconnect(conn, &url)
-		return
-	} else if resp.StatusCode > 101 {
-		log.Printf("%s Получил неожиданный код статуса от %s (%d). Больше не подключаюсь.\n", s.ClientIP, url, resp.StatusCode)
-		return
-	}
-
-	s.relaysMu.Lock()
-	s.Relays[conn] = ctx
-	s.relaysMu.Unlock()
-
-	log.Printf("%s %s связанный\n", s.ClientIP, url)
-
-	s.OpenSubscriptions(ctx, conn)
-
-	defer s.Reconnect(conn, &url)
-	defer conn.Close(websocket.StatusNormalClosure, "")
-
+loop:
 	for {
-		var data []interface{}
-		if err := wsjson.Read(ctx, conn, &data); err != nil {
-			break
+		if s.destroyed {
+			return
 		}
 
-		if data == nil {
-			break
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+
+		defer cancel()
+
+		s.cancelMu.Lock()
+		s.CancelZone[ctx] = cancel
+		s.cancelMu.Unlock()
+
+		connHeaders := make(http.Header)
+		connHeaders.Add("User-Agent", "Blyat; Nostr relay bouncer; https://github.com/Yonle/blyat")
+
+		conn, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{
+			HTTPHeader:      connHeaders,
+			CompressionMode: websocket.CompressionContextTakeover,
+		})
+
+		s.cancelMu.Lock()
+		delete(s.CancelZone, ctx)
+		s.cancelMu.Unlock()
+
+		if s.destroyed && err == nil {
+			conn.CloseNow()
+			return
 		}
 
-		switch data[0].(string) {
-		case "EVENT":
-			s.HandleUpstreamEVENT(data)
-		case "EOSE":
-			s.HandleUpstreamEOSE(data)
+		if err != nil {
+			continue loop
+		}
+
+		defer conn.CloseNow()
+
+		if resp.StatusCode >= 500 {
+			continue loop
+		} else if resp.StatusCode > 101 {
+			log.Printf("%s Получил неожиданный код статуса от %s (%d). Больше не подключаюсь.\n", s.ClientIP, url, resp.StatusCode)
+			return
+		}
+
+		s.relaysMu.Lock()
+		s.Relays[conn] = ctx
+		s.relaysMu.Unlock()
+
+		log.Printf("%s %s связанный\n", s.ClientIP, url)
+
+		s.OpenSubscriptions(ctx, conn)
+
+		for {
+			var data []interface{}
+			if err := wsjson.Read(ctx, conn, &data); err != nil {
+				break
+			}
+
+			if data == nil {
+				continue
+			}
+
+			switch data[0].(string) {
+			case "EVENT":
+				s.HandleUpstreamEVENT(data)
+			case "EOSE":
+				s.HandleUpstreamEOSE(data)
+			}
+		}
+
+		conn.Close(websocket.StatusNormalClosure, "")
+
+		if s.destroyed {
+			log.Printf("%s %s: Отключение\n", s.ClientIP, url)
+			return
+		}
+
+		log.Printf("%s Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", s.ClientIP, url)
+
+		s.relaysMu.Lock()
+		delete(s.Relays, conn)
+		s.relaysMu.Unlock()
+
+		time.Sleep(5 * time.Second)
+
+		if s.destroyed {
+			return
 		}
 	}
-}
-
-func (s *Session) Reconnect(conn *websocket.Conn, url *string) {
-	if s.destroyed {
-		log.Printf("%s %s: Отключение\n", s.ClientIP, *url)
-		return
-	}
-
-	log.Printf("%s Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", s.ClientIP, *url)
-
-	s.relaysMu.Lock()
-	delete(s.Relays, conn)
-	s.relaysMu.Unlock()
-
-	time.Sleep(5 * time.Second)
-	if s.destroyed {
-		return
-	}
-
-	s.NewConn(*url)
 }
 
 func (s *Session) StartConnect() {

@@ -53,7 +53,7 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 	}()
 
 	defer sess.Destroy()
-	defer log.Println("%s отключен (%s)", ip, ua)
+	defer log.Printf("%s отключен (%s)", ip, ua)
 	defer c.Close(websocket.StatusUnsupportedData, "Данные не в формате JSON")
 
 	for {

@@ -43,7 +43,7 @@ func ShowNIP11(w http.ResponseWriter) {
 
 func handleRequest(w http.ResponseWriter, r *http.Request) {
 	xff := r.Header.Get("X-Forwarded-For")
-  ua := r.Header.Get("User-Agent")
+	ua := r.Header.Get("User-Agent")
 	ip := strings.Split(xff, ",")[0]
 
 	if len(ip) < 1 {
@@ -72,7 +72,7 @@ func main() {
 
 	ReadConfig(Config_Filename, &config)
 
-	go http.HandleFunc("/", handleRequest)
+	http.HandleFunc("/", handleRequest)
 
 	log.Printf("Прослушивание на %s....\n", config.Listen)
 

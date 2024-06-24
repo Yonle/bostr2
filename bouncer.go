@@ -55,7 +55,8 @@ func (s *Session) NewConn(url string) {
 	connHeaders.Add("User-Agent", "Blyat; Nostr relay bouncer; https://github.com/Yonle/blyat")
 
 	conn, resp, err := websocket.Dial(ctx, url, &websocket.DialOptions{
-		HTTPHeader: connHeaders,
+		HTTPHeader:      connHeaders,
+		CompressionMode: websocket.CompressionContextTakeover,
 	})
 
 	s.cancelMu.Lock()

@@ -72,7 +72,6 @@ loop:
 
 		if err != nil {
 			cancel()
-			log.Printf("%s Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", s.ClientIP, url)
 			time.Sleep(5 * time.Second)
 			continue loop
 		}
@@ -80,21 +79,17 @@ loop:
 		if resp.StatusCode >= 500 {
 			cancel()
 			conn.CloseNow()
-			log.Printf("%s Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", s.ClientIP, url)
 			time.Sleep(5 * time.Second)
 			continue loop
 		} else if resp.StatusCode > 101 {
 			cancel()
 			conn.CloseNow()
-			log.Printf("%s Получил неожиданный код статуса от %s (%d). Больше не подключаюсь.\n", s.ClientIP, url, resp.StatusCode)
 			return
 		}
 
 		s.relaysMu.Lock()
 		s.Relays[conn] = struct{}{}
 		s.relaysMu.Unlock()
-
-		log.Printf("%s %s связанный\n", s.ClientIP, url)
 
 		s.OpenSubscriptions(ctx, conn)
 
@@ -120,11 +115,8 @@ loop:
 		cancel()
 
 		if s.destroyed {
-			log.Printf("%s %s: Отключение\n", s.ClientIP, url)
 			return
 		}
-
-		log.Printf("%s Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", s.ClientIP, url)
 
 		s.relaysMu.Lock()
 		delete(s.Relays, conn)

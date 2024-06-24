@@ -50,10 +50,10 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		ip = r.RemoteAddr
 	}
 
-	log.Println(ip, r.Method, r.URL, ua)
 	if r.Method == http.MethodGet && r.Header.Get("Upgrade") == "websocket" {
 		Accept_Websocket(w, r, ip, ua)
 	} else {
+		log.Println(ip, r.Method, r.URL, ua)
 		accept := r.Header.Get("Accept")
 		if strings.Contains(accept, "application/nostr+json") {
 			ShowNIP11(w)

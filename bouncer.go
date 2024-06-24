@@ -73,12 +73,16 @@ loop:
 		}
 
 		if err != nil {
+			log.Printf("%s Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", s.ClientIP, url)
+			time.Sleep(5 * time.Second)
 			continue loop
 		}
 
 		defer conn.CloseNow()
 
 		if resp.StatusCode >= 500 {
+			log.Printf("%s Произошла ошибка при подключении к %s. Повторная попытка через 5 секунд....\n", s.ClientIP, url)
+			time.Sleep(5 * time.Second)
 			continue loop
 		} else if resp.StatusCode > 101 {
 			log.Printf("%s Получил неожиданный код статуса от %s (%d). Больше не подключаюсь.\n", s.ClientIP, url, resp.StatusCode)

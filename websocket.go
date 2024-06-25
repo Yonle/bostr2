@@ -4,6 +4,7 @@ import (
 	"context"
 	"log"
 	"net/http"
+
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
 )
@@ -26,51 +27,43 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 	log.Printf("%s связанный (%s)", ip, ua)
 
-	var sess = &Session{
+	var s = &Session{
 		ClientIP:    ip,
-		Sub_IDs:     make(SessionSubIDs),
-		Event_IDs:   make(SessionEventIDs),
-		PendingEOSE: make(SessionPendingEOSE),
-		Relays:      make(SessionRelays),
-		CancelZone:  make(SessionRelayCancelContext),
-
-		UpstreamMessage: make(SessionUpstreamMessage),
-		Done:            make(SessionDoneChannel),
+		ClientREQ:   make(MessageChan),
+		ClientCLOSE: make(MessageChan),
+		ClientEVENT: make(MessageChan),
+		UpMessage:     make(MessageChan),
 	}
 
 	go func() {
-	listener:
-		for {
-			select {
-			case msg := <-sess.UpstreamMessage:
-				if err := wsjson.Write(ctx, c, *msg); err != nil {
-					break listener
-				}
-			case <-sess.Done:
-				break listener
+		for msg := range s.UpMessage {
+			if err := wsjson.Write(ctx, c, msg); err != nil {
+				break
 			}
 		}
 	}()
 
-	defer sess.Destroy()
+	defer s.Destroy()
 	defer log.Printf("%s отключен (%s)", ip, ua)
 	defer c.Close(websocket.StatusUnsupportedData, "Данные не в формате JSON")
 
 	for {
-		var json []interface{}
+		var json []Message
 		if err := wsjson.Read(ctx, c, &json); err != nil {
 			break
 		}
 
-		cmd := json[0].(string)
-
-		switch cmd {
+		switch json[0].(string) {
 		case "REQ":
-			sess.REQ(&json)
+			if len(json) < 3 {
+				s.UpMessage <- &[]Message{"NOTICE", "error: invalid request"}
+			}
+
+			s.ClientREQ <- &json
 		case "CLOSE":
-			sess.CLOSE(&json, true)
+			s.ClientCLOSE <- &json
 		case "EVENT":
-			sess.EVENT(&json)
+			s.ClientEVENT <- &json
 		}
 	}
 }

@@ -1,11 +1,13 @@
 package main
 
 import (
+	"context"
 	"log"
 	"sync"
 	"time"
 
-	"github.com/gorilla/websocket"
+	"nhooyr.io/websocket"
+	"nhooyr.io/websocket/wsjson"
 )
 
 type Message interface{}
@@ -46,8 +48,6 @@ type Session struct {
 	destroy   chan struct{}
 	destroyed chan struct{}
 }
-
-var dialer = websocket.Dialer{}
 
 func (s *Session) Start() {
 	log.Println(s.ClientIP, "warming up...")
@@ -165,6 +165,7 @@ func (s *Session) Start() {
 
 	// deal with relays
 	go func() {
+		ctx := context.Background()
 	listener:
 		for {
 			select {
@@ -173,7 +174,7 @@ func (s *Session) Start() {
 				// or delete websocket.Conn on s.relays
 				if s.isDestroyed() {
 					if conn != nil {
-						conn.Close()
+						conn.CloseNow()
 					}
 					continue listener
 				}
@@ -182,7 +183,7 @@ func (s *Session) Start() {
 
 				for subID, filters := range s.subscriptions {
 					ReqData := append([]Message{"REQ", subID}, (*filters)...)
-					conn.WriteJSON(&ReqData)
+					wsjson.Write(ctx, conn, &ReqData)
 				}
 
 			case conn := <-s.upDel:
@@ -192,7 +193,7 @@ func (s *Session) Start() {
 				// deal with client message
 				// broadcast validated Message to every single s.relays
 				for conn := range s.relays {
-					if err := conn.WriteJSON(d); err != nil {
+					if err := wsjson.Write(ctx, conn, d); err != nil {
 						s.upDel <- conn
 					}
 				}
@@ -253,25 +254,31 @@ func (s *Session) newConn(url string) {
 			break
 		}
 
-		conn, _, err := dialer.Dial(url, nil)
+		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+
+		conn, _, err := websocket.Dial(ctx, url, nil)
 
 		if s.isDestroyed() {
+			cancel()
 			if conn != nil {
-				conn.Close()
+				conn.CloseNow()
 			}
 			break
 		}
 
 		if err != nil {
+			cancel()
 			time.Sleep(5 * time.Second)
 			continue
 		}
 
 		s.upAdd <- conn
 
+		rctx := context.Background()
+
 		for {
 			var json []Message
-			if err := conn.ReadJSON(&json); err != nil {
+			if err := wsjson.Read(rctx, conn, &json); err != nil {
 				break
 			}
 
@@ -283,8 +290,8 @@ func (s *Session) newConn(url string) {
 			}
 		}
 
+		cancel()
 		s.upDel <- conn
-		log.Println("well.")
 
 		if !s.isDestroyed() {
 			time.Sleep(5 * time.Second)
@@ -294,6 +301,6 @@ func (s *Session) newConn(url string) {
 
 func (s *Session) preDestroy() {
 	for conn := range s.relays {
-		conn.Close()
+		conn.CloseNow()
 	}
 }

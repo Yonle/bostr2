@@ -1,28 +1,33 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"net/http"
 	"sync"
 
-	"github.com/gorilla/websocket"
+	"nhooyr.io/websocket"
+	"nhooyr.io/websocket/wsjson"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-	CheckOrigin:     func(_ *http.Request) bool { return true },
-}
-
 func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua string) {
-	conn, err := upgrader.Upgrade(w, r, nil)
+	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
+		InsecureSkipVerify: true,
+		CompressionMode:    websocket.CompressionContextTakeover,
+	})
 
 	if err != nil {
 		return
 	}
 
+	defer conn.CloseNow()
+
 	log.Printf("%s connected (%s)", ip, ua)
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	defer cancel()
 
 	var once sync.Once
 
@@ -50,7 +55,7 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 	go func() {
 		for msg := range s.UpMessage {
-			if err := conn.WriteJSON(msg); err != nil {
+			if err := wsjson.Write(ctx, conn, msg); err != nil {
 				break
 			}
 		}
@@ -62,7 +67,7 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 listener:
 	for {
 		var json []Message
-		if err := conn.ReadJSON(&json); err != nil {
+		if err := wsjson.Read(ctx, conn, &json); err != nil {
 			break
 		}
 

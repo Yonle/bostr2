@@ -1,16 +1,21 @@
 package main
 
 import (
-	"context"
+	"log"
 	"sync"
 	"time"
 
-	"nhooyr.io/websocket"
-	"nhooyr.io/websocket/wsjson"
+	"github.com/gorilla/websocket"
 )
 
 type Message interface{}
 type MessageChan chan *[]Message
+type WebSocketChan chan *websocket.Conn
+
+type SessionEvents map[string]map[string]struct{}
+type SessionEOSEs map[string]int
+type SessionSubs map[string]*[]Message
+type SessionRelays map[*websocket.Conn]struct{}
 
 type Session struct {
 	ClientIP string
@@ -26,23 +31,32 @@ type Session struct {
 	upEOSE  MessageChan
 
 	// if this channel received the websocket.Conn, Put to s.relays
-	upAdd     chan *websocket.Conn
-	upDel     chan *websocket.Conn
+	upAdd     WebSocketChan
+	upDel     WebSocketChan
 	UpMessage MessageChan // to sent to client
 
-	events        map[string]map[string]struct{}
-	pendingEOSE   map[string]int
-	subscriptions map[string]*[]Message
-	relays        map[*websocket.Conn]struct{}
-	wg            sync.WaitGroup
+	events        SessionEvents
+	pendingEOSE   SessionEOSEs
+	subscriptions SessionSubs
+	relays        SessionRelays
+
+	once sync.Once
+	wg   sync.WaitGroup
+
+	destroy   chan struct{}
+	destroyed chan struct{}
 }
 
+var dialer = websocket.Dialer{}
+
 func (s *Session) Start() {
+	log.Println(s.ClientIP, "warming up...")
+
 	// connect first
 	for _, url := range config.Relays {
-		s.wg.Add(1)
 		go s.newConn(url)
 	}
+	s.wg.Add(len(config.Relays))
 
 	// receive stuff from upstream
 	go func() {
@@ -87,7 +101,6 @@ func (s *Session) Start() {
 			case d := <-s.upEOSE:
 				subID, ok := (*d)[1].(string)
 				if !ok {
-					// unusual.
 					continue listener
 				}
 
@@ -101,15 +114,9 @@ func (s *Session) Start() {
 					delete(s.pendingEOSE, subID)
 					s.UpMessage <- d
 				}
-			}
-		}
-	}()
 
-	// receive stuff from client
-	go func() {
-	listener:
-		for {
-			select {
+			// receive stuff from client
+
 			case d := <-s.ClientREQ:
 				subID, ok := (*d)[1].(string)
 				if !ok {
@@ -150,58 +157,121 @@ func (s *Session) Start() {
 
 				s.clientMessage <- d
 				s.UpMessage <- &[]Message{"OK", id, true, ""}
+			case <-s.destroyed:
+				break listener
 			}
 		}
 	}()
 
-	// deal with messages like broadcast,
-	// if not messages then deal with s.relays
+	// deal with relays
 	go func() {
+	listener:
 		for {
 			select {
-			// deal with relays
-			// add websocket.Conn to s.relays
-			// or delete websocket.Conn on s.relays
 			case conn := <-s.upAdd:
+				// add websocket.Conn to s.relays
+				// or delete websocket.Conn on s.relays
+				if s.isDestroyed() {
+					if conn != nil {
+						conn.Close()
+					}
+					continue listener
+				}
+
 				s.relays[conn] = struct{}{}
+
+				for subID, filters := range s.subscriptions {
+					ReqData := append([]Message{"REQ", subID}, (*filters)...)
+					conn.WriteJSON(&ReqData)
+				}
+
 			case conn := <-s.upDel:
 				delete(s.relays, conn)
 
-			// deal with client message
-			// broadcast validated Message to every single s.relays
 			case d := <-s.clientMessage:
+				// deal with client message
+				// broadcast validated Message to every single s.relays
 				for conn := range s.relays {
-					ctx := context.Background()
-					if err := wsjson.Write(ctx, conn, d); err != nil {
+					if err := conn.WriteJSON(d); err != nil {
 						s.upDel <- conn
 					}
 				}
+
+			case <-s.destroyed:
+				break listener
+
+			case <-s.destroy:
+				s.once.Do(s.preDestroy)
+
+			}
+		}
+	}()
+
+	// deal with destroy request.
+	go func() {
+	listener:
+		for {
+			select {
+			case <-s.destroy:
+				log.Println(s.ClientIP, "cleaning up...")
+
+				s.wg.Wait()
+
+				close(s.destroyed)
+				close(s.ClientREQ)
+				close(s.ClientCLOSE)
+				close(s.ClientEVENT)
+				close(s.clientMessage)
+
+				close(s.upEVENT)
+				close(s.upEOSE)
+				close(s.upAdd)
+				close(s.upDel)
+				close(s.UpMessage)
+
+				log.Println(s.ClientIP, "=================== cleaned.")
+				break listener
 			}
 		}
 	}()
 }
 
-func (s *Session) Destroy() {
-	s.wg.Wait()
+func (s *Session) isDestroyed() bool {
+	select {
+	case <-s.destroy:
+		return true
+	default:
+		return false
+	}
 }
 
 func (s *Session) newConn(url string) {
 	defer s.wg.Done()
-	for {
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 
-		conn, _, err := websocket.Dial(ctx, url, nil)
+	for {
+		if s.isDestroyed() {
+			break
+		}
+
+		conn, _, err := dialer.Dial(url, nil)
+
+		if s.isDestroyed() {
+			if conn != nil {
+				conn.Close()
+			}
+			break
+		}
 
 		if err != nil {
-			cancel()
+			time.Sleep(5 * time.Second)
 			continue
 		}
 
-		rctx := context.Background()
+		s.upAdd <- conn
 
 		for {
 			var json []Message
-			if err := wsjson.Read(rctx, conn, &json); err != nil {
+			if err := conn.ReadJSON(&json); err != nil {
 				break
 			}
 
@@ -213,6 +283,17 @@ func (s *Session) newConn(url string) {
 			}
 		}
 
-		cancel()
+		s.upDel <- conn
+		log.Println("well.")
+
+		if !s.isDestroyed() {
+			time.Sleep(5 * time.Second)
+		}
+	}
+}
+
+func (s *Session) preDestroy() {
+	for conn := range s.relays {
+		conn.Close()
 	}
 }

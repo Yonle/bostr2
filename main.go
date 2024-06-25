@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	_ "net/http/pprof"
 	"strings"
 )
 
@@ -13,13 +14,13 @@ var config Config
 var Config_Filename string
 
 func ShowInfo(w http.ResponseWriter, r *http.Request) {
-	str := "СУКА БЛЯТЬ - bostr следующего поколения\n\n"
+	str := "СУКА БЛЯТЬ - bostr next generation\n\n"
 
 	for _, r := range config.Relays {
 		str += fmt.Sprintf("- %s\n", r)
 	}
 
-	str += fmt.Sprintf("\nПодключитесь к wss://%s или ws://%s (если не используете TLS)\n", r.Host, r.Host)
+	str += fmt.Sprintf("\nConnect to wss://%s or ws://%s (if not using TLS)\n", r.Host, r.Host)
 
 	str += "\nPowered by blyat - https://github.com/Yonle/blyat"
 
@@ -64,17 +65,17 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	flag.StringVar(&Config_Filename, "configfile", "config.yaml", "Путь к файлу конфигурации YAML")
+	flag.StringVar(&Config_Filename, "configfile", "config.yaml", "Path to YAML config file")
 	flag.Parse()
 
-	fmt.Println("СУКА БЛЯТЬ - bostr следующего поколения")
-	log.Printf("Чтение %s в текущем каталоге....\n", Config_Filename)
+	fmt.Println("СУКА БЛЯТЬ - bostr next generation")
+	log.Printf("Reading config file %s....\n", Config_Filename)
 
 	ReadConfig(Config_Filename, &config)
 
 	http.HandleFunc("/", handleRequest)
 
-	log.Printf("Прослушивание на %s....\n", config.Listen)
+	log.Printf("Listening on %s....\n", config.Listen)
 
 	if err := http.ListenAndServe(config.Listen, nil); err != nil {
 		panic(err)

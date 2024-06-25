@@ -26,14 +26,15 @@ type Session struct {
 	upEOSE  MessageChan
 
 	// if this channel received the websocket.Conn, Put to s.relays
-	upCONNECTED chan *websocket.Conn
-	UpMessage   MessageConn // to sent to client
+	upAdd     chan *websocket.Conn
+	upDel     chan *websocket.Conn
+	UpMessage MessageChan // to sent to client
 
-	events       map[string]map[string]struct{}
-	pendingEOSE  map[string]int
-	subscriptons map[string]Message
-	relays       map[*websocket.Conn]struct{}
-	wg           sync.WaitGroup
+	events        map[string]map[string]struct{}
+	pendingEOSE   map[string]int
+	subscriptions map[string]*[]Message
+	relays        map[*websocket.Conn]struct{}
+	wg            sync.WaitGroup
 }
 
 func (s *Session) Start() {
@@ -49,18 +50,28 @@ func (s *Session) Start() {
 		for {
 			select {
 			case d := <-s.upEVENT:
-				subID := (*d)[1].(string)
+				subID, ok1 := (*d)[1].(string)
+
+				if !ok1 {
+					continue listener
+				}
 
 				if _, ok := s.events[subID]; !ok {
 					continue listener
 				}
 
-				event := (*d)[2].(map[string]interface{})
-				eventID := event["id"].(string)
+				event, ok2 := (*d)[2].(map[string]interface{})
+				if !ok2 {
+					continue listener
+				}
 
-				_, ok := s.events[subID][eventID]
+				eventID, ok3 := event["id"].(string)
 
-				if ok {
+				if !ok3 {
+					continue listener
+				}
+
+				if _, ok := s.events[subID][eventID]; ok {
 					continue listener
 				}
 
@@ -74,7 +85,12 @@ func (s *Session) Start() {
 					}
 				}
 			case d := <-s.upEOSE:
-				subID := (*d)[1].(string)
+				subID, ok := (*d)[1].(string)
+				if !ok {
+					// unusual.
+					continue listener
+				}
+
 				if _, ok := s.pendingEOSE[subID]; !ok {
 					continue listener
 				}
@@ -91,14 +107,49 @@ func (s *Session) Start() {
 
 	// receive stuff from client
 	go func() {
+	listener:
 		for {
 			select {
 			case d := <-s.ClientREQ:
-				
-				s.pendingEOSE[subID]
-			case d := <-s.ClientCLOSE:
+				subID, ok := (*d)[1].(string)
+				if !ok {
+					s.UpMessage <- &[]Message{"NOTICE", "error: invalid REQ"}
+					continue listener
+				}
 
+				filters := (*d)[2:]
+				s.subscriptions[subID] = &filters
+				s.events[subID] = make(map[string]struct{})
+				s.pendingEOSE[subID] = 0
+
+				s.clientMessage <- d
+			case d := <-s.ClientCLOSE:
+				subID, ok := (*d)[1].(string)
+				if !ok {
+					s.UpMessage <- &[]Message{"NOTICE", "error: invalid EVENT"}
+					continue listener
+				}
+
+				delete(s.subscriptions, subID)
+				delete(s.events, subID)
+				delete(s.pendingEOSE, subID)
+
+				s.clientMessage <- d
 			case d := <-s.ClientEVENT:
+				event, ok := (*d)[1].(map[string]interface{})
+				if !ok {
+					s.UpMessage <- &[]Message{"NOTICE", "error: invalid EVENT"}
+					continue listener
+				}
+
+				id, actuallyOk := event["id"]
+				if !actuallyOk {
+					s.UpMessage <- &[]Message{"NOTICE", "error: invalid EVENT"}
+					continue listener
+				}
+
+				s.clientMessage <- d
+				s.UpMessage <- &[]Message{"OK", id, true, ""}
 			}
 		}
 	}()
@@ -107,9 +158,27 @@ func (s *Session) Start() {
 	// if not messages then deal with s.relays
 	go func() {
 		for {
+			select {
+			// deal with relays
+			// add websocket.Conn to s.relays
+			// or delete websocket.Conn on s.relays
+			case conn := <-s.upAdd:
+				s.relays[conn] = struct{}{}
+			case conn := <-s.upDel:
+				delete(s.relays, conn)
 
+			// deal with client message
+			// broadcast validated Message to every single s.relays
+			case d := <-s.clientMessage:
+				for conn := range s.relays {
+					ctx := context.Background()
+					if err := wsjson.Write(ctx, conn, d); err != nil {
+						s.upDel <- conn
+					}
+				}
+			}
 		}
-	}
+	}()
 }
 
 func (s *Session) Destroy() {

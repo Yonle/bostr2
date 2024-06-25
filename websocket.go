@@ -32,7 +32,7 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 		ClientREQ:   make(MessageChan),
 		ClientCLOSE: make(MessageChan),
 		ClientEVENT: make(MessageChan),
-		UpMessage:     make(MessageChan),
+		UpMessage:   make(MessageChan),
 	}
 
 	go func() {
@@ -47,6 +47,7 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 	defer log.Printf("%s отключен (%s)", ip, ua)
 	defer c.Close(websocket.StatusUnsupportedData, "Данные не в формате JSON")
 
+listener:
 	for {
 		var json []Message
 		if err := wsjson.Read(ctx, c, &json); err != nil {
@@ -56,13 +57,24 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 		switch json[0].(string) {
 		case "REQ":
 			if len(json) < 3 {
-				s.UpMessage <- &[]Message{"NOTICE", "error: invalid request"}
+				s.UpMessage <- &[]Message{"NOTICE", "error: invalid REQ"}
+				continue listener
 			}
 
 			s.ClientREQ <- &json
 		case "CLOSE":
+			if len(json) < 2 {
+				s.UpMessage <- &[]Message{"NOTICE", "error: invalid CLOSE"}
+				continue listener
+			}
+
 			s.ClientCLOSE <- &json
 		case "EVENT":
+			if len(json) < 2 {
+				s.UpMessage <- &[]Message{"NOTICE", "error: invalid EVENT"}
+				continue listener
+			}
+
 			s.ClientEVENT <- &json
 		}
 	}

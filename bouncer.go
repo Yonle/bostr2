@@ -42,7 +42,7 @@ type Session struct {
 	subscriptions SessionSubs
 	relays        SessionRelays
 
-	wg   sync.WaitGroup
+	wg sync.WaitGroup
 
 	destroyed chan struct{}
 	ctx       context.Context
@@ -205,11 +205,11 @@ func (s *Session) Start() {
 			select {
 			case <-s.ctx.Done():
 				go func() {
-					time.Sleep(5*time.Second)
+					time.Sleep(5 * time.Second)
 					select {
-						case <-s.destroyed:
-						default:
-							log.Println(s.ClientIP, "== SESSION SHUTDOWM HANG!! ==")
+					case <-s.destroyed:
+					default:
+						log.Println(s.ClientIP, "== SESSION SHUTDOWM HANG!! ==")
 					}
 				}()
 				s.wg.Wait()
@@ -247,11 +247,11 @@ func (s *Session) newConn(url string) {
 
 listener:
 	for {
-		ctx, cancel := context.WithTimeout(s.ctx, 20*time.Second)
-		conn, _, err := websocket.Dial(ctx, url, nil)
+		dialCtx, dialCancel := context.WithTimeout(s.ctx, 20*time.Second)
+		conn, _, err := websocket.Dial(dialCtx, url, nil)
+		dialCancel()
 
 		if err != nil {
-			cancel()
 			select {
 			case <-s.ctx.Done():
 				break listener
@@ -263,7 +263,8 @@ listener:
 
 		s.upAdd <- conn
 
-		messageListener: for {
+	messageListener:
+		for {
 			var json []Message
 			if err := wsjson.Read(s.ctx, conn, &json); err != nil {
 				break messageListener
@@ -277,7 +278,7 @@ listener:
 			}
 		}
 
-		cancel()
+		conn.CloseNow()
 
 		select {
 		case <-s.ctx.Done():

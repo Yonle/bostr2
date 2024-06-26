@@ -247,7 +247,7 @@ func (s *Session) newConn(url string) {
 
 listener:
 	for {
-		dialCtx, dialCancel := context.WithTimeout(s.ctx, 20*time.Second)
+		dialCtx, dialCancel := context.WithTimeout(s.ctx, 5*time.Second)
 		conn, _, err := websocket.Dial(dialCtx, url, nil)
 		dialCancel()
 

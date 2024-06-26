@@ -49,8 +49,8 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 		subscriptions: make(SessionSubs),
 		relays:        make(SessionRelays),
 
-		destroy:   make(chan struct{}),
 		destroyed: make(chan struct{}),
+		ctx:       ctx,
 	}
 
 	go func() {
@@ -61,7 +61,6 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 		}
 	}()
 
-	defer close(s.destroy)
 	defer log.Printf("%s disconnect (%s)", ip, ua)
 
 listener:

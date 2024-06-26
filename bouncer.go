@@ -42,21 +42,18 @@ type Session struct {
 	subscriptions SessionSubs
 	relays        SessionRelays
 
-	once sync.Once
 	wg   sync.WaitGroup
 
-	destroy   chan struct{}
 	destroyed chan struct{}
+	ctx       context.Context
 }
 
 func (s *Session) Start() {
-	log.Println(s.ClientIP, "warming up...")
-
 	// connect first
 	for _, url := range config.Relays {
+		s.wg.Add(1)
 		go s.newConn(url)
 	}
-	s.wg.Add(len(config.Relays))
 
 	// receive stuff from upstream
 	go func() {
@@ -165,7 +162,6 @@ func (s *Session) Start() {
 
 	// deal with relays
 	go func() {
-		ctx := context.Background()
 	listener:
 		for {
 			select {
@@ -183,7 +179,7 @@ func (s *Session) Start() {
 
 				for subID, filters := range s.subscriptions {
 					ReqData := append([]Message{"REQ", subID}, (*filters)...)
-					wsjson.Write(ctx, conn, &ReqData)
+					wsjson.Write(s.ctx, conn, &ReqData)
 				}
 
 			case conn := <-s.upDel:
@@ -193,17 +189,11 @@ func (s *Session) Start() {
 				// deal with client message
 				// broadcast validated Message to every single s.relays
 				for conn := range s.relays {
-					if err := wsjson.Write(ctx, conn, d); err != nil {
-						s.upDel <- conn
-					}
+					wsjson.Write(s.ctx, conn, d)
 				}
 
 			case <-s.destroyed:
 				break listener
-
-			case <-s.destroy:
-				s.once.Do(s.preDestroy)
-
 			}
 		}
 	}()
@@ -213,13 +203,19 @@ func (s *Session) Start() {
 	listener:
 		for {
 			select {
-			case <-s.destroy:
-				log.Println(s.ClientIP, "cleaning up...")
-
+			case <-s.ctx.Done():
+				go func() {
+					time.Sleep(5*time.Second)
+					select {
+						case <-s.destroyed:
+						default:
+							log.Println(s.ClientIP, "== SESSION SHUTDOWM HANG!! ==")
+					}
+				}()
 				s.wg.Wait()
 
 				close(s.destroyed)
-				close(s.ClientREQ)
+				/*close(s.ClientREQ)
 				close(s.ClientCLOSE)
 				close(s.ClientEVENT)
 				close(s.clientMessage)
@@ -228,9 +224,9 @@ func (s *Session) Start() {
 				close(s.upEOSE)
 				close(s.upAdd)
 				close(s.upDel)
-				close(s.UpMessage)
+				close(s.UpMessage)*/
 
-				log.Println(s.ClientIP, "=================== cleaned.")
+				log.Println(s.ClientIP, "=================== clean shutdown finished.")
 				break listener
 			}
 		}
@@ -239,7 +235,7 @@ func (s *Session) Start() {
 
 func (s *Session) isDestroyed() bool {
 	select {
-	case <-s.destroy:
+	case <-s.ctx.Done():
 		return true
 	default:
 		return false
@@ -249,37 +245,28 @@ func (s *Session) isDestroyed() bool {
 func (s *Session) newConn(url string) {
 	defer s.wg.Done()
 
+listener:
 	for {
-		if s.isDestroyed() {
-			break
-		}
-
-		ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
-
+		ctx, cancel := context.WithTimeout(s.ctx, 20*time.Second)
 		conn, _, err := websocket.Dial(ctx, url, nil)
-
-		if s.isDestroyed() {
-			cancel()
-			if conn != nil {
-				conn.CloseNow()
-			}
-			break
-		}
 
 		if err != nil {
 			cancel()
-			time.Sleep(5 * time.Second)
-			continue
+			select {
+			case <-s.ctx.Done():
+				break listener
+			default:
+				time.Sleep(5 * time.Second)
+				continue listener
+			}
 		}
 
 		s.upAdd <- conn
 
-		rctx := context.Background()
-
-		for {
+		messageListener: for {
 			var json []Message
-			if err := wsjson.Read(rctx, conn, &json); err != nil {
-				break
+			if err := wsjson.Read(s.ctx, conn, &json); err != nil {
+				break messageListener
 			}
 
 			switch json[0].(string) {
@@ -291,16 +278,14 @@ func (s *Session) newConn(url string) {
 		}
 
 		cancel()
-		s.upDel <- conn
 
-		if !s.isDestroyed() {
+		select {
+		case <-s.ctx.Done():
+			break listener
+		default:
+			s.upDel <- conn
 			time.Sleep(5 * time.Second)
+			continue listener
 		}
-	}
-}
-
-func (s *Session) preDestroy() {
-	for conn := range s.relays {
-		conn.CloseNow()
 	}
 }

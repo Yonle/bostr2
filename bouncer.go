@@ -173,18 +173,19 @@ func (s *Session) Start() {
 			case conn := <-s.upAdd:
 				// add websocket.Conn to s.relays
 				// or delete websocket.Conn on s.relays
-				if s.isDestroyed() {
+				select {
+				case s.ctx.Done():
 					if conn != nil {
 						conn.CloseNow()
 					}
 					continue listener
-				}
+				default:
+					s.relays[conn] = struct{}{}
 
-				s.relays[conn] = struct{}{}
-
-				for subID, filters := range s.subscriptions {
-					ReqData := append([]Message{"REQ", subID}, (*filters)...)
-					wsjson.Write(s.ctx, conn, &ReqData)
+					for subID, filters := range s.subscriptions {
+						ReqData := append([]Message{"REQ", subID}, (*filters)...)
+						wsjson.Write(s.ctx, conn, &ReqData)
+					}
 				}
 
 			case conn := <-s.upDel:
@@ -241,60 +242,52 @@ func (s *Session) Start() {
 	}()
 }
 
-func (s *Session) isDestroyed() bool {
-	select {
-	case <-s.ctx.Done():
-		return true
-	default:
-		return false
-	}
-}
-
 func (s *Session) newConn(url string) {
 	defer s.wg.Done()
 
-listener:
+	/*listener:
+	for {*/
+	dialCtx, dialCancel := context.WithTimeout(s.ctx, 5*time.Second)
+	conn, _, err := websocket.Dial(dialCtx, url, nil)
+	dialCancel()
+
+	if err != nil {
+		/*			select {
+					case <-s.ctx.Done():
+						break listener
+					default:
+						time.Sleep(5 * time.Second)
+						continue listener
+					}*/
+		return
+	}
+
+	s.upAdd <- conn
+
+messageListener:
 	for {
-		dialCtx, dialCancel := context.WithTimeout(s.ctx, 5*time.Second)
-		conn, _, err := websocket.Dial(dialCtx, url, nil)
-		dialCancel()
-
-		if err != nil {
-			select {
-			case <-s.ctx.Done():
-				break listener
-			default:
-				time.Sleep(5 * time.Second)
-				continue listener
-			}
+		var json []Message
+		if err := wsjson.Read(s.ctx, conn, &json); err != nil {
+			break messageListener
 		}
 
-		s.upAdd <- conn
-
-	messageListener:
-		for {
-			var json []Message
-			if err := wsjson.Read(s.ctx, conn, &json); err != nil {
-				break messageListener
-			}
-
-			switch json[0].(string) {
-			case "EVENT":
-				s.upEVENT <- &json
-			case "EOSE":
-				s.upEOSE <- &json
-			}
-		}
-
-		conn.CloseNow()
-
-		select {
-		case <-s.ctx.Done():
-			break listener
-		default:
-			s.upDel <- conn
-			time.Sleep(5 * time.Second)
-			continue listener
+		switch json[0].(string) {
+		case "EVENT":
+			s.upEVENT <- &json
+		case "EOSE":
+			s.upEOSE <- &json
 		}
 	}
+
+	conn.CloseNow()
+
+	select {
+	case <-s.ctx.Done():
+		//break listener
+	default:
+		s.upDel <- conn
+		//time.Sleep(5 * time.Second)
+		//continue listener
+	}
+	//}
 }

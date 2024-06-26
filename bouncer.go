@@ -42,7 +42,7 @@ type Session struct {
 	subscriptions SessionSubs
 	relays        SessionRelays
 
-	wg sync.WaitGroup
+	wg         sync.WaitGroup
 	listenerWg sync.WaitGroup
 
 	destroyed chan struct{}
@@ -60,7 +60,7 @@ func (s *Session) Start() {
 
 	// receive stuff from upstream
 	go func() {
-	defer s.listenerWg.Done()
+		defer s.listenerWg.Done()
 	listener:
 		for {
 			select {
@@ -166,7 +166,7 @@ func (s *Session) Start() {
 
 	// deal with relays
 	go func() {
-	defer s.listenerWg.Done()
+		defer s.listenerWg.Done()
 	listener:
 		for {
 			select {

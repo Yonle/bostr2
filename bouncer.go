@@ -43,6 +43,7 @@ type Session struct {
 	relays        SessionRelays
 
 	wg sync.WaitGroup
+	listenerWg sync.WaitGroup
 
 	destroyed chan struct{}
 	ctx       context.Context
@@ -55,8 +56,11 @@ func (s *Session) Start() {
 		go s.newConn(url)
 	}
 
+	s.listenerWg.Add(2)
+
 	// receive stuff from upstream
 	go func() {
+	defer s.listenerWg.Done()
 	listener:
 		for {
 			select {
@@ -162,6 +166,7 @@ func (s *Session) Start() {
 
 	// deal with relays
 	go func() {
+	defer s.listenerWg.Done()
 	listener:
 		for {
 			select {
@@ -215,7 +220,10 @@ func (s *Session) Start() {
 				s.wg.Wait()
 
 				close(s.destroyed)
-				/*close(s.ClientREQ)
+
+				s.listenerWg.Wait()
+
+				close(s.ClientREQ)
 				close(s.ClientCLOSE)
 				close(s.ClientEVENT)
 				close(s.clientMessage)
@@ -224,7 +232,7 @@ func (s *Session) Start() {
 				close(s.upEOSE)
 				close(s.upAdd)
 				close(s.upDel)
-				close(s.UpMessage)*/
+				close(s.UpMessage)
 
 				log.Println(s.ClientIP, "=================== clean shutdown finished.")
 				break listener

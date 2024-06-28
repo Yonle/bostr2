@@ -174,7 +174,7 @@ func (s *Session) Start() {
 				// add websocket.Conn to s.relays
 				// or delete websocket.Conn on s.relays
 				select {
-				case s.ctx.Done():
+				case <-s.ctx.Done():
 					if conn != nil {
 						conn.CloseNow()
 					}

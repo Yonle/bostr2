@@ -215,7 +215,7 @@ func (s *Session) Start() {
 					select {
 					case <-s.destroyed:
 					default:
-						log.Println(s.ClientIP, "== SESSION SHUTDOWM HANG!! ==")
+						log.Println("%s == %s of websocket.Conn still stuck. Possible memory leak!! ==", s.ClientIP, len(s.relays))
 					}
 				}()
 				s.wg.Wait()
@@ -245,49 +245,51 @@ func (s *Session) Start() {
 func (s *Session) newConn(url string) {
 	defer s.wg.Done()
 
-	/*listener:
-	for {*/
-	dialCtx, dialCancel := context.WithTimeout(s.ctx, 5*time.Second)
-	conn, _, err := websocket.Dial(dialCtx, url, nil)
-	dialCancel()
-
-	if err != nil {
-		/*			select {
-					case <-s.ctx.Done():
-						break listener
-					default:
-						time.Sleep(5 * time.Second)
-						continue listener
-					}*/
-		return
-	}
-
-	s.upAdd <- conn
-
-messageListener:
+listener:
 	for {
-		var json []Message
-		if err := wsjson.Read(s.ctx, conn, &json); err != nil {
-			break messageListener
+		dialCtx, dialCancel := context.WithTimeout(s.ctx, 5*time.Second)
+		conn, _, err := websocket.Dial(dialCtx, url, nil)
+		dialCancel()
+
+		select {
+		case <-s.ctx.Done():
+			if conn != nil {
+				conn.CloseNow()
+			}
+			break listener
+		default:
+			if err != nil {
+				time.Sleep(5 * time.Second)
+				continue listener
+			}
 		}
 
-		switch json[0].(string) {
-		case "EVENT":
-			s.upEVENT <- &json
-		case "EOSE":
-			s.upEOSE <- &json
+		s.upAdd <- conn
+
+	messageListener:
+		for {
+			var json []Message
+			if err := wsjson.Read(s.ctx, conn, &json); err != nil {
+				break messageListener
+			}
+
+			switch json[0].(string) {
+			case "EVENT":
+				s.upEVENT <- &json
+			case "EOSE":
+				s.upEOSE <- &json
+			}
+		}
+
+		conn.CloseNow()
+
+		select {
+		case <-s.ctx.Done():
+			break listener
+		default:
+			s.upDel <- conn
+			time.Sleep(5 * time.Second)
+			continue listener
 		}
 	}
-
-	conn.CloseNow()
-
-	select {
-	case <-s.ctx.Done():
-		//break listener
-	default:
-		s.upDel <- conn
-		//time.Sleep(5 * time.Second)
-		//continue listener
-	}
-	//}
 }

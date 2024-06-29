@@ -215,7 +215,7 @@ func (s *Session) Start() {
 					select {
 					case <-s.destroyed:
 					default:
-						log.Printf("%s == %s of websocket.Conn still stuck. Possible memory leak!! ==", s.ClientIP, len(s.relays))
+						log.Printf("%s == %d of websocket.Conn still stuck. Possible memory leak!! ==", s.ClientIP, len(s.relays))
 					}
 				}()
 				s.wg.Wait()

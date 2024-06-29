@@ -38,6 +38,10 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 	var s = Session{
 		ClientIP: ip,
 
+		ClientREQ:   make(MessageChan),
+		ClientCLOSE: make(MessageChan),
+		ClientEVENT: make(MessageChan),
+
 		events:        make(SessionEvents),
 		pendingEOSE:   make(SessionEOSEs),
 		subscriptions: make(SessionSubs),
@@ -77,14 +81,14 @@ listener:
 			}
 
 			once.Do(s.Start)
-			s.REQ(json)
+			s.ClientREQ <- json
 		case "CLOSE":
 			if len(json) < 2 {
 				wsjson.Write(ctx, conn, [2]string{"NOTICE", "error: invalid CLOSE"})
 				continue listener
 			}
 
-			s.CLOSE(json)
+			s.ClientCLOSE <- json
 		case "EVENT":
 			if len(json) < 2 {
 				wsjson.Write(ctx, conn, [2]string{"NOTICE", "error: invalid EVENT"})
@@ -92,7 +96,7 @@ listener:
 			}
 
 			once.Do(s.Start)
-			s.CLOSE(json)
+			s.ClientEVENT <- json
 		default:
 			wsjson.Write(ctx, conn, [2]string{"NOTICE", fmt.Sprintf("error: unknown command %s", cmd)})
 		}

@@ -15,8 +15,14 @@ type SessionEvents map[string]map[string]struct{}
 type SessionEOSEs map[string]int
 type SessionSubs map[string][]interface{}
 
+type MessageChan chan []interface{}
+
 type Session struct {
 	ClientIP string
+
+	ClientREQ   MessageChan
+	ClientCLOSE MessageChan
+	ClientEVENT MessageChan
 
 	events        SessionEvents
 	pendingEOSE   SessionEOSEs
@@ -36,7 +42,7 @@ func (s *Session) Start() {
 	go func() {
 		<-s.ctx.Done()
 		go func() {
-			time.Sleep(5 * time.Second)
+			time.Sleep(7 * time.Second)
 			select {
 			case <-s.destroyed:
 			default:
@@ -115,58 +121,72 @@ func (s *Session) Start() {
 					delete(s.pendingEOSE, subID)
 					wsjson.Write(s.ctx, s.conn, [2]string{"EOSE", subID})
 				}
+			case conn, open := <-s.relay.UpConnected:
+				if !open {
+					continue listener
+				}
 
+				for subID, filters := range s.subscriptions {
+					ReqData := append([]interface{}{"REQ", subID}, filters...)
+					wsjson.Write(s.ctx, conn, ReqData)
+				}
+
+			case d, open := <-s.ClientREQ:
+				if !open {
+					continue listener
+				}
+				subID, ok1 := d[1].(string)
+				if !ok1 {
+					wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: received subID is not a string"})
+					continue listener
+				}
+
+				filters := d[2:]
+
+				s.subscriptions[subID] = filters
+				s.events[subID] = make(map[string]struct{})
+				s.pendingEOSE[subID] = 0
+
+				s.relay.Broadcast(d)
+
+			case d, open := <-s.ClientCLOSE:
+				if !open {
+					continue listener
+				}
+				subID, ok1 := d[1].(string)
+				if !ok1 {
+					wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: received subID is not a string"})
+					continue listener
+				}
+
+				delete(s.subscriptions, subID)
+				delete(s.events, subID)
+				delete(s.pendingEOSE, subID)
+
+				s.relay.Broadcast(d)
+
+			case d, open := <-s.ClientEVENT:
+				if !open {
+					continue listener
+				}
+				event, ok1 := d[1].(map[string]interface{})
+				if !ok1 {
+					wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: invalid event"})
+					continue listener
+				}
+
+				id, ok2 := event["id"].(string)
+				if !ok2 {
+					wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: invalid event"})
+					continue listener
+				}
+
+				s.relay.Broadcast(d)
+
+				wsjson.Write(s.ctx, s.conn, [4]interface{}{"OK", id, true, ""})
 			case <-s.destroyed:
 				break listener
 			}
 		}
 	}()
-}
-
-func (s *Session) REQ(data []interface{}) {
-	subID, ok1 := data[1].(string)
-	if !ok1 {
-		wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: received subID is not a string"})
-		return
-	}
-
-	filters := data[2:]
-
-	s.subscriptions[subID] = filters
-	s.events[subID] = make(map[string]struct{})
-	s.pendingEOSE[subID] = 0
-
-	s.relay.Broadcast(data)
-}
-
-func (s *Session) CLOSE(data []interface{}) {
-	subID, ok1 := data[1].(string)
-	if !ok1 {
-		wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: received subID is not a string"})
-		return
-	}
-
-	delete(s.subscriptions, subID)
-	delete(s.events, subID)
-	delete(s.pendingEOSE, subID)
-
-	s.relay.Broadcast(data)
-}
-
-func (s *Session) EVENT(data []interface{}) {
-	event, ok1 := data[1].(map[string]interface{})
-	if !ok1 {
-		wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: invalid event"})
-		return
-	}
-
-	id, ok2 := event["id"].(string)
-	if !ok2 {
-		wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: invalid event"})
-		return
-	}
-
-	s.relay.Broadcast(data)
-
-	wsjson.Write(s.ctx, s.conn, [4]interface{}{"OK", id, true, ""})
 }

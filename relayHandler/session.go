@@ -20,6 +20,7 @@ type RelaySession struct {
 
 	UpEVENT MessageChan
 	UpEOSE  MessageChan
+	UpConnected	chan *websocket.Conn
 
 	HowManyRelaysAreConnected	int
 }
@@ -87,6 +88,8 @@ listener:
 }
 
 func (s *RelaySession) add(conn *websocket.Conn) {
+	s.UpConnected <- conn
+
 	defer s.mu.Unlock()
 	s.mu.Lock()
 

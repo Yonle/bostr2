@@ -14,7 +14,7 @@ var config Config
 var Config_Filename string
 
 func ShowInfo(w http.ResponseWriter, r *http.Request) {
-	str := "СУКА БЛЯТЬ - bostr next generation\n\n"
+	str := "bostr2 - bostr next generation\n\n"
 
 	for _, r := range config.Relays {
 		str += fmt.Sprintf("- %s\n", r)
@@ -22,7 +22,7 @@ func ShowInfo(w http.ResponseWriter, r *http.Request) {
 
 	str += fmt.Sprintf("\nConnect to wss://%s or ws://%s (if not using TLS)\n", r.Host, r.Host)
 
-	str += "\nPowered by blyat - https://github.com/Yonle/blyat"
+	str += "\nPowered by bostr2 - https://github.com/Yonle/bostr2"
 
 	fmt.Fprint(w, str)
 }
@@ -68,7 +68,7 @@ func main() {
 	flag.StringVar(&Config_Filename, "configfile", "config.yaml", "Path to YAML config file")
 	flag.Parse()
 
-	fmt.Println("СУКА БЛЯТЬ - bostr next generation")
+	fmt.Println("bostr2 - bostr next generation")
 	log.Printf("Reading config file %s....\n", Config_Filename)
 
 	ReadConfig(Config_Filename, &config)

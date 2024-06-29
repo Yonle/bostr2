@@ -1,4 +1,4 @@
-module github.com/Yonle/blyat
+module github.com/Yonle/bostr2
 
 go 1.19
 

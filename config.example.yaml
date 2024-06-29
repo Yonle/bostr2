@@ -6,9 +6,9 @@ relays:
 - wss://relay.example2.com
 
 nip_11:
-  name: blyat
-  description: Your relays, OUR RELAYS
-  software: git+https://github.com/Yonle/blyat
+  name: bostr2
+  description: Nostr relay bouncer
+  software: git+https://github.com/Yonle/bostr2
   pubkey: 0000000000000000000000000000000000000000000000000000000000000000
   contact: unset
   supported_nips:

@@ -1,8 +1,8 @@
 
 all: blyat
 
-blyat: main.go websocket.go bouncer.go config.go
-	go build -o blyat main.go websocket.go bouncer.go config.go
+bostr2: main.go websocket.go bouncer.go config.go
+	go build -o bostr2 main.go websocket.go bouncer.go config.go
 
 install:
 	go install .

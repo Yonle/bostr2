@@ -1,13 +1,13 @@
-# СУКА БЛЯТЬ (blyat)
-[bostr](https://github.com/Yonle/bostr) следующего поколения
+# bostr2
+[bostr](https://github.com/Yonle/bostr) next generation
 
-# Инструкция по установке
-Вам понадобится установить [Go](https://go.dev) в вашей системе. После установки выполните следующую команду:
+# Installation instructions
+You will need to install [Go](https://go.dev) on your system. After installation, run the following command:
 ```
-go install github.com/Yonle/blyat@latest
+go install github.com/Yonle/bostr2@latest
 ```
 
-Затем создайте файл конфигурации YAML, который выглядел бы следующим образом:
+Then create a YAML configuration file that looks like this:
 ```yaml
 ---
 listen: localhost:8080
@@ -17,9 +17,9 @@ relays:
 - wss://relay.example2.com
 
 nip_11:
-  name: blyat
-  description: Your relays, OUR RELAYS
-  software: git+https://github.com/Yonle/blyat
+  name: bostr2
+  description: Noetr relay bouncer
+  software: git+https://github.com/Yonle/bostr2
   pubkey: 0000000000000000000000000000000000000000000000000000000000000000
   contact: unset
   supported_nips:
@@ -36,9 +36,9 @@ nip_11:
   - 40
 ```
 
-Сохраните файл конфигурации как config.yaml. После завершения вы можете запустить blyat с помощью следующей команды:
+Save the configuration file as config.yaml. Once completed, you can run bostr2 using the following command:
 ```
-blyat
+bostr2
 ```
 
-Затем вам нужно будет вручную настроить обратный прокси-сервер на вашем сервере (например [nginx](https://nginx.org) или [caddy](https://caddyserver.com)).
+You will then need to manually configure a reverse proxy on your server (eg [nginx](https://nginx.org) or [caddy](https://caddyserver.com)).

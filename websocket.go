@@ -9,6 +9,8 @@ import (
 
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
+
+	"github.com/Yonle/bostr2/relayHandler"
 )
 
 func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua string) {
@@ -29,28 +31,29 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 	defer cancel()
 
+	log.Println("let's cook")
+	var relaySession = relayHandler.NewSession(ctx)
+	log.Println("it cooked.")
+
 	var once sync.Once
 
 	var s = Session{
 		ClientIP:      ip,
-		ClientREQ:     make(MessageChan),
-		ClientCLOSE:   make(MessageChan),
-		ClientEVENT:   make(MessageChan),
-		clientMessage: make(MessageChan),
+		ClientREQ:     make(relayHandler.MessageChan),
+		ClientCLOSE:   make(relayHandler.MessageChan),
+		ClientEVENT:   make(relayHandler.MessageChan),
+		clientMessage: make(relayHandler.MessageChan),
 
-		upEVENT:   make(MessageChan),
-		upEOSE:    make(MessageChan),
-		upAdd:     make(WebSocketChan),
-		upDel:     make(WebSocketChan),
-		UpMessage: make(MessageChan),
+		UpMessage: make(relayHandler.MessageChan),
 
 		events:        make(SessionEvents),
 		pendingEOSE:   make(SessionEOSEs),
 		subscriptions: make(SessionSubs),
-		relays:        make(SessionRelays),
 
 		destroyed: make(chan struct{}),
-		ctx:       ctx,
+
+		relay: relaySession,
+		ctx:   ctx,
 	}
 
 	go func() {
@@ -65,48 +68,48 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 listener:
 	for {
-		var json []Message
+		var json relayHandler.MessageData
 		if err := wsjson.Read(ctx, conn, &json); err != nil {
 			break
 		}
 
 		if len(json) < 1 {
-			s.UpMessage <- &[]Message{"NOTICE", "error: does not looks like there's something in your message."}
+			s.UpMessage <- &relayHandler.MessageData{"NOTICE", "error: does not looks like there's something in your message."}
 			continue listener
 		}
 
 		cmd, ok := json[0].(string)
 		if !ok {
-			s.UpMessage <- &[]Message{"NOTICE", "error: please check your command."}
+			s.UpMessage <- &relayHandler.MessageData{"NOTICE", "error: please check your command."}
 			continue listener
 		}
 
 		switch cmd {
 		case "REQ":
 			if len(json) < 3 {
-				s.UpMessage <- &[]Message{"NOTICE", "error: invalid REQ"}
+				s.UpMessage <- &relayHandler.MessageData{"NOTICE", "error: invalid REQ"}
 				continue listener
 			}
 
 			once.Do(s.Start)
-			s.ClientREQ <- &json
+			//s.ClientREQ <- &json
 		case "CLOSE":
 			if len(json) < 2 {
-				s.UpMessage <- &[]Message{"NOTICE", "error: invalid CLOSE"}
+				s.UpMessage <- &relayHandler.MessageData{"NOTICE", "error: invalid CLOSE"}
 				continue listener
 			}
 
 			s.ClientCLOSE <- &json
 		case "EVENT":
 			if len(json) < 2 {
-				s.UpMessage <- &[]Message{"NOTICE", "error: invalid EVENT"}
+				s.UpMessage <- &relayHandler.MessageData{"NOTICE", "error: invalid EVENT"}
 				continue listener
 			}
 
 			once.Do(s.Start)
 			s.ClientEVENT <- &json
 		default:
-			s.UpMessage <- &[]Message{"NOTICE", fmt.Sprintf("error: unknown command %s", cmd)}
+			s.UpMessage <- &relayHandler.MessageData{"NOTICE", fmt.Sprintf("error: unknown command %s", cmd)}
 		}
 	}
 }

@@ -41,14 +41,14 @@ func (s *Session) Start() {
 	// deal with destroy request.
 	go func() {
 		<-s.ctx.Done()
-		go func() {
+		/*go func() {
 			time.Sleep(7 * time.Second)
 			select {
 			case <-s.destroyed:
 			default:
 				panic("something hangs.")
 			}
-		}()
+		}()*/
 		s.relay.Wait()
 
 		close(s.destroyed)

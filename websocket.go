@@ -53,7 +53,7 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 listener:
 	for {
-		var json interface{}
+		var json []interface{}
 		if err := wsjson.Read(ctx, conn, &json); err != nil {
 			break
 		}

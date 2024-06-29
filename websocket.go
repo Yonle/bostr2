@@ -31,20 +31,12 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 	defer cancel()
 
-	log.Println("let's cook")
 	var relaySession = relayHandler.NewSession(ctx)
-	log.Println("it cooked.")
 
 	var once sync.Once
 
 	var s = Session{
-		ClientIP:      ip,
-		ClientREQ:     make(relayHandler.MessageChan),
-		ClientCLOSE:   make(relayHandler.MessageChan),
-		ClientEVENT:   make(relayHandler.MessageChan),
-		clientMessage: make(relayHandler.MessageChan),
-
-		UpMessage: make(relayHandler.MessageChan),
+		ClientIP: ip,
 
 		events:        make(SessionEvents),
 		pendingEOSE:   make(SessionEOSEs),
@@ -53,63 +45,56 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 		destroyed: make(chan struct{}),
 
 		relay: relaySession,
+		conn:  conn,
 		ctx:   ctx,
 	}
-
-	go func() {
-		for msg := range s.UpMessage {
-			if err := wsjson.Write(ctx, conn, msg); err != nil {
-				break
-			}
-		}
-	}()
 
 	defer log.Printf("%s disconnect (%s)", ip, ua)
 
 listener:
 	for {
-		var json relayHandler.MessageData
+		var json interface{}
 		if err := wsjson.Read(ctx, conn, &json); err != nil {
 			break
 		}
 
 		if len(json) < 1 {
-			s.UpMessage <- &relayHandler.MessageData{"NOTICE", "error: does not looks like there's something in your message."}
+			wsjson.Write(ctx, conn, [2]string{"NOTICE", "error: does not looks like there's something in your message."})
 			continue listener
 		}
 
 		cmd, ok := json[0].(string)
 		if !ok {
-			s.UpMessage <- &relayHandler.MessageData{"NOTICE", "error: please check your command."}
+			wsjson.Write(ctx, conn, [2]string{"NOTICE", "error: please check your command."})
 			continue listener
 		}
 
 		switch cmd {
 		case "REQ":
 			if len(json) < 3 {
-				s.UpMessage <- &relayHandler.MessageData{"NOTICE", "error: invalid REQ"}
+				wsjson.Write(ctx, conn, [2]string{"NOTICE", "error: invalid REQ"})
 				continue listener
 			}
 
 			once.Do(s.Start)
-			//s.ClientREQ <- &json
+			s.REQ(json)
 		case "CLOSE":
 			if len(json) < 2 {
-				s.UpMessage <- &relayHandler.MessageData{"NOTICE", "error: invalid CLOSE"}
+				wsjson.Write(ctx, conn, [2]string{"NOTICE", "error: invalid CLOSE"})
 				continue listener
 			}
 
-			s.ClientCLOSE <- &json
+			s.CLOSE(json)
 		case "EVENT":
 			if len(json) < 2 {
-				s.UpMessage <- &relayHandler.MessageData{"NOTICE", "error: invalid EVENT"}
+				wsjson.Write(ctx, conn, [2]string{"NOTICE", "error: invalid EVENT"})
 				continue listener
 			}
 
 			once.Do(s.Start)
-			s.ClientEVENT <- &json
+			s.CLOSE(json)
 		default:
-			s.UpMessage <- &relayHandler.MessageData{"NOTICE", fmt.Sprintf("error: unknown command %s", cmd)}
+			wsjson.Write(ctx, conn, [2]string{"NOTICE", fmt.Sprintf("error: unknown command %s", cmd)})
 		}
 	}
 }

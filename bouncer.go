@@ -34,26 +34,21 @@ func (s *Session) Start() {
 
 	// deal with destroy request.
 	go func() {
-	listener:
-		for {
+		<-s.ctx.Done()
+		go func() {
+			time.Sleep(5 * time.Second)
 			select {
-			case <-s.ctx.Done():
-				go func() {
-					time.Sleep(5 * time.Second)
-					select {
-					case <-s.destroyed:
-					default:
-						panic("something hangs.")
-					}
-				}()
-				s.relay.Wait()
-
-				close(s.destroyed)
-
-				log.Println(s.ClientIP, "=================== clean shutdown finished.")
-				break listener
+			case <-s.destroyed:
+			default:
+				panic("something hangs.")
 			}
-		}
+		}()
+		s.relay.Wait()
+
+		close(s.destroyed)
+
+		log.Println(s.ClientIP, "=================== clean shutdown finished.")
+
 	}()
 
 	// deal with what upstream says
@@ -129,31 +124,31 @@ func (s *Session) Start() {
 }
 
 func (s *Session) REQ(data []interface{}) {
-	subid, ok1 := data[1].(string)
+	subID, ok1 := data[1].(string)
 	if !ok1 {
-		wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: received subid is not a string"})
+		wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: received subID is not a string"})
 		return
 	}
 
 	filters := data[2:]
 
-	s.subscriptions[subid] = filters
-	s.events[subid] = make(map[string]struct{})
-	s.pendingEOSE[subid] = 0
+	s.subscriptions[subID] = filters
+	s.events[subID] = make(map[string]struct{})
+	s.pendingEOSE[subID] = 0
 
 	s.relay.Broadcast(data)
 }
 
 func (s *Session) CLOSE(data []interface{}) {
-	subid, ok1 := data[1].(string)
+	subID, ok1 := data[1].(string)
 	if !ok1 {
-		wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: received subid is not a string"})
+		wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: received subID is not a string"})
 		return
 	}
 
-	delete(s.subscriptions, subid)
-	delete(s.events, subid)
-	delete(s.pendingEOSE, subid)
+	delete(s.subscriptions, subID)
+	delete(s.events, subID)
+	delete(s.pendingEOSE, subID)
 
 	s.relay.Broadcast(data)
 }

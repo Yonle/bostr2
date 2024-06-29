@@ -1,5 +1,5 @@
 
-all: blyat
+all: bostr2
 
 bostr2: main.go websocket.go bouncer.go config.go
 	go build -o bostr2 main.go websocket.go bouncer.go config.go

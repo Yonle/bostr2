@@ -25,9 +25,7 @@ type RelaySession struct {
 	HowManyRelaysAreConnected int
 }
 
-var DialOptions = &websocket.DialOptions{
-	CompressionMode: websocket.CompressionContextTakeover,
-}
+var DialOptions = &websocket.DialOptions{}
 
 func (s *RelaySession) Init(r []string) {
 	s.wg.Add(len(r))

@@ -13,11 +13,13 @@ import (
 	"github.com/Yonle/bostr2/relayHandler"
 )
 
+var AcceptOptions = &websocket.AcceptOptions{
+	InsecureSkipVerify: true,
+	CompressionMode:    websocket.CompressionContextTakeover,
+}
+
 func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua string) {
-	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
-		InsecureSkipVerify: true,
-		CompressionMode:    websocket.CompressionContextTakeover,
-	})
+	conn, err := websocket.Accept(w, r, AcceptOptions)
 
 	if err != nil {
 		return

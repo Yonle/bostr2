@@ -2,8 +2,7 @@ package main
 
 import (
 	"context"
-	"log"
-//	"time"
+	//"time"
 
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
@@ -52,9 +51,6 @@ func (s *Session) Start() {
 		s.relay.Wait()
 
 		close(s.destroyed)
-
-		log.Println(s.ClientIP, "=================== clean shutdown finished.")
-
 	}()
 
 	// deal with what upstream says

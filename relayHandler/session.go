@@ -18,11 +18,15 @@ type RelaySession struct {
 
 	relays SessionRelays
 
-	UpEVENT MessageChan
-	UpEOSE  MessageChan
-	UpConnected	chan *websocket.Conn
+	UpEVENT     MessageChan
+	UpEOSE      MessageChan
+	UpConnected chan *websocket.Conn
 
-	HowManyRelaysAreConnected	int
+	HowManyRelaysAreConnected int
+}
+
+var DialOptions = &websocket.DialOptions{
+	CompressionMode: websocket.CompressionContextTakeover,
 }
 
 func (s *RelaySession) Init(r []string) {
@@ -38,7 +42,7 @@ func (s *RelaySession) connect(url string) {
 listener:
 	for {
 		dialCtx, dialCancel := context.WithTimeout(s.ctx, 5*time.Second)
-		conn, _, err := websocket.Dial(dialCtx, url, nil)
+		conn, _, err := websocket.Dial(dialCtx, url, DialOptions)
 		dialCancel()
 
 		select {

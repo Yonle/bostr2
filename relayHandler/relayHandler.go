@@ -11,8 +11,8 @@ func NewSession(ctx context.Context) RelaySession {
 
 		relays: make(SessionRelays),
 
-		UpEVENT: make(MessageChan),
-		UpEOSE:  make(MessageChan),
-		UpConnected:	make(chan *websocket.Conn),
+		UpEVENT:     make(MessageChan),
+		UpEOSE:      make(MessageChan),
+		UpConnected: make(chan *websocket.Conn),
 	}
 }

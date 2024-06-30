@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log"
 	"net/http"
-	"sync"
 
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
@@ -34,9 +33,6 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 	defer cancel()
 
 	var relaySession = relayHandler.NewSession(ctx)
-
-	var once sync.Once
-
 	var s = Session{
 		ClientIP: ip,
 
@@ -84,7 +80,6 @@ listener:
 				continue listener
 			}
 
-			once.Do(s.Start)
 			s.ClientREQ <- json
 		case "CLOSE":
 			if len(json) < 2 {
@@ -99,7 +94,6 @@ listener:
 				continue listener
 			}
 
-			once.Do(s.Start)
 			s.ClientEVENT <- json
 		default:
 			wsjson.Write(ctx, conn, [2]string{"NOTICE", fmt.Sprintf("error: unknown command %s", cmd)})

@@ -36,7 +36,9 @@ type Session struct {
 
 func (s *Session) Start() {
 	s.relay.Init(config.Relays)
+}
 
+func (s *Session) StartListening() {
 	// deal with destroy request.
 	go func() {
 		<-s.ctx.Done()
@@ -160,6 +162,7 @@ func (s *Session) Start() {
 				delete(s.pendingEOSE, subID)
 
 				s.relay.Broadcast(d)
+				wsjson.Write(s.ctx, s.conn, [3]string{"CLOSED", subID, ""})
 
 			case d, open := <-s.ClientEVENT:
 				if !open {
@@ -167,13 +170,13 @@ func (s *Session) Start() {
 				}
 				event, ok1 := d[1].(map[string]interface{})
 				if !ok1 {
-					wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: invalid event"})
+					wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: invalid EVENT"})
 					continue listener
 				}
 
 				id, ok2 := event["id"].(string)
 				if !ok2 {
-					wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: invalid event"})
+					wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: invalid EVENT"})
 					continue listener
 				}
 

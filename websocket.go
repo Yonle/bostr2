@@ -55,6 +55,8 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 		ctx:   ctx,
 	}
 
+	s.StartListening()
+
 	defer log.Printf("%s disconnect (%s)", ip, ua)
 
 listener:

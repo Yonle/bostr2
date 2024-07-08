@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -48,7 +49,7 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 		destroyed: make(chan struct{}),
 
-		relay: relaySession,
+		relay: &relaySession,
 		conn:  conn,
 		ctx:   ctx,
 	}
@@ -59,44 +60,44 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 listener:
 	for {
-		var json []interface{}
-		if err := wsjson.Read(ctx, conn, &json); err != nil {
+		var data []json.RawMessage
+		if err := wsjson.Read(ctx, conn, &data); err != nil {
 			break
 		}
 
-		if len(json) < 1 {
+		if len(data) < 1 {
 			wsjson.Write(ctx, conn, [2]string{"NOTICE", "error: does not looks like there's something in your message."})
 			continue listener
 		}
 
-		cmd, ok := json[0].(string)
-		if !ok {
+		var cmd string
+		if err := json.Unmarshal(data[0], &cmd); err != nil {
 			wsjson.Write(ctx, conn, [2]string{"NOTICE", "error: please check your command."})
 			continue listener
 		}
 
 		switch cmd {
 		case "REQ":
-			if len(json) < 3 {
+			if len(data) < 3 {
 				wsjson.Write(ctx, conn, [2]string{"NOTICE", "error: invalid REQ"})
 				continue listener
 			}
 
-			s.ClientREQ <- json
+			s.ClientREQ <- data
 		case "CLOSE":
-			if len(json) < 2 {
+			if len(data) < 2 {
 				wsjson.Write(ctx, conn, [2]string{"NOTICE", "error: invalid CLOSE"})
 				continue listener
 			}
 
-			s.ClientCLOSE <- json
+			s.ClientCLOSE <- data
 		case "EVENT":
-			if len(json) < 2 {
+			if len(data) < 2 {
 				wsjson.Write(ctx, conn, [2]string{"NOTICE", "error: invalid EVENT"})
 				continue listener
 			}
 
-			s.ClientEVENT <- json
+			s.ClientEVENT <- data
 		default:
 			wsjson.Write(ctx, conn, [2]string{"NOTICE", fmt.Sprintf("error: unknown command %s", cmd)})
 		}

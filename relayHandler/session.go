@@ -2,13 +2,15 @@ package relayHandler
 
 import (
 	"context"
-	"nhooyr.io/websocket"
-	"nhooyr.io/websocket/wsjson"
+	"encoding/json"
 	"sync"
 	"time"
+	
+	"nhooyr.io/websocket"
+	"nhooyr.io/websocket/wsjson"
 )
 
-type MessageChan chan []interface{}
+type MessageChan chan []json.RawMessage
 type SessionRelays map[*websocket.Conn]struct{}
 
 type RelaySession struct {
@@ -61,17 +63,23 @@ listener:
 
 	messageListener:
 		for {
-			var json []interface{}
-			if err := wsjson.Read(s.ctx, conn, &json); err != nil {
+			var data []json.RawMessage
+			if err := wsjson.Read(s.ctx, conn, &data); err != nil {
 				break messageListener
 			}
 
-			// big failure for next gen
-			switch json[0].(string) {
+			var cmd string
+
+			if err := json.Unmarshal(data[0], &cmd); err != nil {
+				// ignore
+				continue messageListener
+			}
+
+			switch cmd {
 			case "EVENT":
-				s.UpEVENT <- json
+				s.UpEVENT <- data
 			case "EOSE":
-				s.UpEOSE <- json
+				s.UpEOSE <- data
 			}
 		}
 
@@ -105,7 +113,7 @@ func (s *RelaySession) del(conn *websocket.Conn) {
 	delete(s.relays, conn)
 }
 
-func (s *RelaySession) Broadcast(data []interface{}) {
+func (s *RelaySession) Broadcast(data []json.RawMessage) {
 	defer s.mu.RUnlock()
 	s.mu.RLock()
 

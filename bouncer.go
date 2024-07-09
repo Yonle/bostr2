@@ -215,6 +215,12 @@ func (s *Session) handleUpstreamEVENT(d []json.RawMessage) {
 		return
 	}
 
+	// get the filters and validate
+	if filters := s.subscriptions[subID]; !filters.Match(&event) {
+		// "shut"
+		return
+	}
+
 	s.events[subID][eventID] = struct{}{}
 	wsjson.Write(s.ctx, s.conn, d)
 

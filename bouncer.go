@@ -3,7 +3,11 @@ package main
 import (
 	"context"
 	"sync"
+	"fmt"
+
 	//"time"
+	"encoding/json"
+	"github.com/nbd-wtf/go-nostr"
 
 	"nhooyr.io/websocket"
 	"nhooyr.io/websocket/wsjson"
@@ -13,11 +17,11 @@ import (
 
 type SessionEvents map[string]map[string]struct{}
 type SessionEOSEs map[string]int
-type SessionSubs map[string][]interface{}
+type SessionSubs map[string]nostr.Filters
 
-type MessageChan chan []interface{}
+type MessageChan chan []json.RawMessage
 
-type ClientEvents []map[string]interface{}
+type ClientEvents []nostr.Event
 
 type Session struct {
 	ClientIP string
@@ -31,7 +35,7 @@ type Session struct {
 	pendingEOSE   SessionEOSEs
 	subscriptions SessionSubs
 
-	relay relayHandler.RelaySession
+	relay *relayHandler.RelaySession
 
 	destroyed chan struct{}
 	once      sync.Once
@@ -112,26 +116,39 @@ func (s *Session) StartListening() {
 
 func (s *Session) reopenSubscriptions(conn *websocket.Conn) {
 	for subID, filters := range s.subscriptions {
-		data := append([]interface{}{"REQ", subID}, filters...)
+		data := []interface{}{"REQ", subID, filters...}
+
 		wsjson.Write(s.ctx, conn, data)
 	}
 }
 
 func (s *Session) resendEvents(conn *websocket.Conn) {
 	for _, event := range s.clientEvents {
-		data := [2]interface{}{"EVENT", event}
+		data := []interface{}{"EVENT", event}
+
 		wsjson.Write(s.ctx, conn, data)
 	}
 }
 
-func (s *Session) handleClientREQ(d []interface{}) {
-	subID, ok1 := d[1].(string)
-	if !ok1 {
+func (s *Session) handleClientREQ(d []json.RawMessage) {
+	var subID string
+	if err := json.Unmarshal(d[1], &subID); err != nil {
 		wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: received subID is not a string"})
 		return
 	}
 
-	filters := d[2:]
+	var filters nostr.Filters
+
+	for index, rawFilter := range d[2:] {
+		var filter nostr.Filter
+		if err := filter.UnmarshalJSON(rawFilter); err != nil {
+			// if it doesn't looks finje, then just stop.
+			wsjson.Write(s.ctx, s.conn, [3]string{"CLOSED", subID, fmt.Sprintf("error: one of your filter on index %d does not looks right.", index)})
+			return
+		}
+
+		filters = append(filters, filter)
+	}
 
 	s.subscriptions[subID] = filters
 	s.events[subID] = make(map[string]struct{})
@@ -141,9 +158,9 @@ func (s *Session) handleClientREQ(d []interface{}) {
 	s.relay.Broadcast(d)
 }
 
-func (s *Session) handleClientCLOSE(d []interface{}) {
-	subID, ok1 := d[1].(string)
-	if !ok1 {
+func (s *Session) handleClientCLOSE(d []json.RawMessage) {
+	var subID string
+	if err := json.Unmarshal(d[1], &subID); err != nil {
 		wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: received subID is not a string"})
 		return
 	}
@@ -156,18 +173,14 @@ func (s *Session) handleClientCLOSE(d []interface{}) {
 	wsjson.Write(s.ctx, s.conn, [3]string{"CLOSED", subID, ""})
 }
 
-func (s *Session) handleClientEVENT(d []interface{}) {
-	event, ok1 := d[1].(map[string]interface{})
-	if !ok1 {
+func (s *Session) handleClientEVENT(d []json.RawMessage) {
+	var event nostr.Event
+	if err := event.UnmarshalJSON(d[1]); err != nil {
 		wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: invalid EVENT"})
 		return
 	}
 
-	id, ok2 := event["id"].(string)
-	if !ok2 {
-		wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: invalid EVENT"})
-		return
-	}
+	id := event.GetID()
 
 	s.once.Do(s.Start)
 
@@ -177,10 +190,9 @@ func (s *Session) handleClientEVENT(d []interface{}) {
 	wsjson.Write(s.ctx, s.conn, [4]interface{}{"OK", id, true, ""})
 }
 
-func (s *Session) handleUpstreamEVENT(d []interface{}) {
-	subID, ok1 := d[1].(string)
-
-	if !ok1 {
+func (s *Session) handleUpstreamEVENT(d []json.RawMessage) {
+	var subID string
+	if err := json.Unmarshal(d[1], &subID); err != nil {
 		return
 	}
 
@@ -188,16 +200,13 @@ func (s *Session) handleUpstreamEVENT(d []interface{}) {
 		return
 	}
 
-	event, ok2 := d[2].(map[string]interface{})
-	if !ok2 {
+	var event nostr.Event
+
+	if err := event.UnmarshalJSON(d[2]); err != nil {
 		return
 	}
 
-	eventID, ok3 := event["id"].(string)
-
-	if !ok3 {
-		return
-	}
+	eventID := event.GetID()
 
 	if _, ok := s.events[subID][eventID]; ok {
 		return
@@ -214,9 +223,9 @@ func (s *Session) handleUpstreamEVENT(d []interface{}) {
 	}
 }
 
-func (s *Session) handleUpstreamEOSE(d []interface{}) {
-	subID, ok := d[1].(string)
-	if !ok {
+func (s *Session) handleUpstreamEOSE(d []json.RawMessage) {
+	var subID string
+	if err := json.Unmarshal(d[1], &subID); err != nil {
 		return
 	}
 

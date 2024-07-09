@@ -127,13 +127,19 @@ func (s *Session) reopenSubscriptions(conn *websocket.Conn) {
 
 			data = append(data, []byte(fs))
 		}
+
 		wsjson.Write(s.ctx, conn, data)
 	}
 }
 
 func (s *Session) resendEvents(conn *websocket.Conn) {
 	for _, event := range s.clientEvents {
-		data := [2]interface{}{"EVENT", event}
+		var data []json.RawMessage
+		var d1, _ = json.Marshal("EVENT")
+		var d2, _ = json.Marshal(event)
+
+		data = append(data, d1, d2)
+
 		wsjson.Write(s.ctx, conn, data)
 	}
 }

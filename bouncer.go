@@ -116,17 +116,7 @@ func (s *Session) StartListening() {
 
 func (s *Session) reopenSubscriptions(conn *websocket.Conn) {
 	for subID, filters := range s.subscriptions {
-		var data []json.RawMessage
-		var d1, _ = json.Marshal("REQ")
-		var d2, _ = json.Marshal(subID)
-
-		data = append(data, d1, d2)
-
-		for _, f := range filters {
-			fs := f.String()
-
-			data = append(data, []byte(fs))
-		}
+		data := []interface{}{"REQ", subID, filters...}
 
 		wsjson.Write(s.ctx, conn, data)
 	}
@@ -134,11 +124,7 @@ func (s *Session) reopenSubscriptions(conn *websocket.Conn) {
 
 func (s *Session) resendEvents(conn *websocket.Conn) {
 	for _, event := range s.clientEvents {
-		var data []json.RawMessage
-		var d1, _ = json.Marshal("EVENT")
-		var d2, _ = json.Marshal(event)
-
-		data = append(data, d1, d2)
+		data := []interface{}{"EVENT", event}
 
 		wsjson.Write(s.ctx, conn, data)
 	}

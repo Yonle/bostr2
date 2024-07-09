@@ -116,7 +116,10 @@ func (s *Session) StartListening() {
 
 func (s *Session) reopenSubscriptions(conn *websocket.Conn) {
 	for subID, filters := range s.subscriptions {
-		data := []interface{}{"REQ", subID, filters...}
+		data := []interface{}{"REQ", subID}
+		for filter := range filters {
+			data = append(data, filter)
+		}
 
 		wsjson.Write(s.ctx, conn, data)
 	}

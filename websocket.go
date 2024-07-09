@@ -62,7 +62,7 @@ listener:
 	for {
 		var data []json.RawMessage
 		if err := wsjson.Read(ctx, conn, &data); err != nil {
-			break
+			break listener
 		}
 
 		if len(data) < 1 {

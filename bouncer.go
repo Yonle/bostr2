@@ -115,11 +115,18 @@ func (s *Session) StartListening() {
 }
 
 func (s *Session) reopenSubscriptions(conn *websocket.Conn) {
-	// todo: fix this
 	for subID, filters := range s.subscriptions {
-		// filters is nostr.Filters, which is []nostr.Filter
-		d1 := []string{"REQ", subID}
-		
+		var data []json.RawMessage
+		var d1, _ = json.Marshal("REQ")
+		var d2, _ = json.Marshal(subID)
+
+		data = append(data, d1, d2)
+
+		for _, f := range filters {
+			fs := f.String()
+
+			data = append(data, []byte(fs))
+		}
 		wsjson.Write(s.ctx, conn, data)
 	}
 }

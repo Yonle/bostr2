@@ -185,10 +185,10 @@ func (s *Session) handleClientEVENT(d []json.RawMessage) {
 
 	id := event.GetID()
 
-	s.once.Do(s.Start)
-
-	s.relay.Broadcast(d)
 	s.clientEvents = append(s.clientEvents, event)
+
+	s.once.Do(s.Start)
+	s.relay.Broadcast(d)
 
 	wsjson.Write(s.ctx, s.conn, [4]interface{}{"OK", id, true, ""})
 }

@@ -60,9 +60,23 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 listener:
 	for {
-		var data []json.RawMessage
-		if err := wsjson.Read(ctx, conn, &data); err != nil {
+		mt, msg, err := conn.Read(ctx)
+		if err != nil {
+			log.Printf("%s: %v", ip, err)
 			break listener
+		}
+
+		if mt != websocket.MessageText {
+			log.Printf("%s is sending non-UTF-8 data. disconnecting....", ip)
+			break listener
+		}
+
+		var data []json.RawMessage
+
+		if err := json.Unmarshal(msg, &data); err != nil {
+			// doesn't looks right
+			wsjson.Write(ctx, conn, [2]string{"NOTICE", "error: your json doesn't looks right."})
+			continue listener
 		}
 
 		if len(data) < 1 {

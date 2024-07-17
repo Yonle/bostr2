@@ -63,9 +63,18 @@ listener:
 
 	messageListener:
 		for {
-			var data []json.RawMessage
-			if err := wsjson.Read(s.ctx, conn, &data); err != nil {
+			mt, msg, err := conn.Read(s.ctx)
+			if err != nil {
 				break messageListener
+			}
+
+			if mt != websocket.MessageText {
+				break messageListener
+			}
+
+			var data []json.RawMessage
+			if err := json.Unmarshal(msg, &data); err != nil {
+				continue messageListener
 			}
 
 			var cmd string

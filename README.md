@@ -36,6 +36,7 @@ nip_11:
   - 22
   - 33
   - 40
+  - 50
 ```
 
 Save the configuration file as config.yaml. Once completed, you can run bostr2 using the following command:

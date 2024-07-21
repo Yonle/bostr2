@@ -65,6 +65,12 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleFavicon(w http.ResponseWriter, r *http.Request) {
+	xff := r.Header.Get("X-Forwarded-For")
+	ua := r.Header.Get("User-Agent")
+	ip := strings.Split(xff, ",")[0]
+
+	log.Println(ip, r.Method, r.URL, ua)
+
 	var header = w.Header()
 	header.Set("Content-Type", "image/vnd.microsoft.icon")
 	header.Set("Access-Control-Allow-Origin", "*")

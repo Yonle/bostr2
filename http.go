@@ -2,15 +2,16 @@ package main
 
 import (
 	"encoding/json"
-	"flag"
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strings"
 )
 
 var config Config
 var Config_Filename string
+var FaviconBytes []byte
 
 func ShowInfo(w http.ResponseWriter, r *http.Request) {
 	str := "bostr2 - bostr next generation\n\n"
@@ -63,15 +64,38 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func main() {
-	flag.StringVar(&Config_Filename, "configfile", "config.yaml", "Path to YAML config file")
-	flag.Parse()
+func handleFavicon(w http.ResponseWriter, r *http.Request) {
+	var header = w.Header()
+	header.Set("Content-Type", "image/vnd.microsoft.icon")
+	header.Set("Access-Control-Allow-Origin", "*")
 
-	fmt.Println("bostr2 - bostr next generation")
+	w.Write(FaviconBytes)
+}
+
+func LoadFavicon() {
+	if len(config.Favicon) < 1 {
+		return
+	}
+
+	bytes, err := os.ReadFile(config.Favicon)
+
+	if err != nil {
+		log.Printf("Failed to load favicon (%s) into memory: %v", config.Favicon, err)
+		return
+	}
+
+	FaviconBytes = bytes
+	log.Printf("Loaded favicon (%s) into memory", config.Favicon)
+}
+
+func LoadConfig() {
 	log.Printf("Reading config file %s....\n", Config_Filename)
 
 	ReadConfig(Config_Filename, &config)
+}
 
+func Serve() {
+	http.HandleFunc("/favicon.ico", handleFavicon)
 	http.HandleFunc("/", handleRequest)
 
 	log.Printf("Listening on %s....\n", config.Listen)

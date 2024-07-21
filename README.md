@@ -12,6 +12,8 @@ Then create a YAML configuration file that looks like this:
 ---
 listen: localhost:8080
 
+favicon:
+
 relays:
 - wss://relay.example1.com
 - wss://relay.example2.com

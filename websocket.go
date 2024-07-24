@@ -60,14 +60,9 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 listener:
 	for {
-		mt, msg, err := conn.Read(ctx)
+		_, msg, err := conn.Read(ctx)
 		if err != nil {
 			log.Printf("%s: %v", ip, err)
-			break listener
-		}
-
-		if mt != websocket.MessageText {
-			log.Printf("%s is sending non-UTF-8 data. disconnecting....", ip)
 			break listener
 		}
 

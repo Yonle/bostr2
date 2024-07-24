@@ -30,6 +30,8 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 	log.Printf("%s connected (%s)", ip, ua)
 
+	conn.SetReadLimit(-1)
+
 	// we are not expecting normal users would remain connected for more than 30 minutes.
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Minute)
 

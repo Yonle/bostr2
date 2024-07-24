@@ -58,6 +58,8 @@ listener:
 			}
 		}
 
+		conn.SetReadLimit(-1)
+
 		s.add(conn)
 		s.HowManyRelaysAreConnected++
 

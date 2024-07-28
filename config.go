@@ -4,8 +4,8 @@ import (
 	"bufio"
 	_ "embed"
 	"fmt"
-	"log"
 	"github.com/goccy/go-yaml"
+	"log"
 	"os"
 	"strings"
 )

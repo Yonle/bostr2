@@ -55,6 +55,13 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 		Accept_Websocket(w, r, ip, ua)
 	} else {
 		log.Println(ip, r.Method, r.URL, ua)
+
+		// HUH??
+		if len(r.Header.Get("Upgrade")) > 0 {
+			http.Error(w, "Invalid Upgrade Header", 400)
+			return
+		}
+
 		accept := r.Header.Get("Accept")
 		if strings.Contains(accept, "application/nostr+json") {
 			ShowNIP11(w)

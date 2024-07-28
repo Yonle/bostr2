@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"strings"
 	"time"
 
 	"nhooyr.io/websocket"
@@ -14,12 +15,19 @@ import (
 	"github.com/Yonle/bostr2/relayHandler"
 )
 
-var AcceptOptions = &websocket.AcceptOptions{
-	InsecureSkipVerify: true,
-	CompressionMode:    websocket.CompressionContextTakeover,
-}
-
 func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua string) {
+	var AcceptOptions = &websocket.AcceptOptions{
+		InsecureSkipVerify: true,
+		CompressionMode:    websocket.CompressionContextTakeover,
+	}
+
+	isApple := (strings.Contains(ua, "CFNetwork") || strings.Contains(ua, "Safari")) && !strings.Contains(ua, "Chrome") && !strings.Contains(ua, "Firefox")
+
+	// compression is fucked on apple & nobody knows why.
+	if isApple {
+		AcceptOptions.CompressionMode = websocket.CompressionDisabled
+	}
+
 	conn, err := websocket.Accept(w, r, AcceptOptions)
 
 	if err != nil {

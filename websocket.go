@@ -16,6 +16,7 @@ import (
 
 var AcceptOptions = &websocket.AcceptOptions{
 	InsecureSkipVerify: true,
+	CompressionMode:    websocket.CompressionContextTakeover,
 }
 
 func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua string) {

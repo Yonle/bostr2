@@ -5,9 +5,9 @@ go 1.21
 toolchain go1.23rc1
 
 require (
-	github.com/goccy/go-yaml v1.11.3
-	github.com/nbd-wtf/go-nostr v0.34.1
-	nhooyr.io/websocket v1.8.11
+	github.com/coder/websocket v1.8.12
+	github.com/goccy/go-yaml v1.12.0
+	github.com/nbd-wtf/go-nostr v0.34.5
 )
 
 require (

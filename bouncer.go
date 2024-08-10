@@ -9,8 +9,8 @@ import (
 	"encoding/json"
 	"github.com/nbd-wtf/go-nostr"
 
-	"nhooyr.io/websocket"
-	"nhooyr.io/websocket/wsjson"
+	"github.com/coder/websocket"
+	"github.com/coder/websocket/wsjson"
 
 	"github.com/Yonle/bostr2/relayHandler"
 )

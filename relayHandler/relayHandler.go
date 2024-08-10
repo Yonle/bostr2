@@ -2,7 +2,7 @@ package relayHandler
 
 import (
 	"context"
-	"nhooyr.io/websocket"
+	"github.com/coder/websocket"
 )
 
 func NewSession(ctx context.Context) RelaySession {

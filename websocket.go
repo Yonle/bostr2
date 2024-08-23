@@ -34,6 +34,7 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 		return
 	}
 
+	defer ConnPerIPRateLimit_OnDisconnect(ip)
 	defer conn.CloseNow()
 
 	log.Printf("%s connected (%s)", ip, ua)

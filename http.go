@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"os"
 	"strings"
@@ -48,10 +49,14 @@ func handleRequest(w http.ResponseWriter, r *http.Request) {
 	ip := strings.Split(xff, ",")[0]
 
 	if len(ip) < 1 {
-		ip = r.RemoteAddr
+		ip, _, _ = net.SplitHostPort(r.RemoteAddr)
 	}
 
 	if r.Method == http.MethodGet && r.Header.Get("Upgrade") == "websocket" {
+		if pass := ConnPerIPRateLimit_Pass(ip, w); !pass {
+			return
+		}
+
 		Accept_Websocket(w, r, ip, ua)
 	} else {
 		log.Println(ip, r.Method, r.URL, ua)

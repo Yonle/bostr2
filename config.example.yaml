@@ -25,3 +25,6 @@ nip_11:
   - 22
   - 33
   - 40
+
+# 0 is infinity
+max_connections_per_ip: 3

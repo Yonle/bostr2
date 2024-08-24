@@ -3,14 +3,19 @@ package main
 import (
 	"log"
 	"net/http"
+	"sync"
 )
 
 var ips = make(map[string]int)
+var mu sync.Mutex
 
 func ConnPerIPRateLimit_Pass(ip string, w http.ResponseWriter) (pass bool) {
 	if config.MaxConnectionsPerIP < 1 {
 		return true
 	}
+
+	mu.Lock()
+	defer mu.Unlock()
 
 	conns, ok := ips[ip]
 	if !ok {
@@ -29,6 +34,13 @@ func ConnPerIPRateLimit_Pass(ip string, w http.ResponseWriter) (pass bool) {
 }
 
 func ConnPerIPRateLimit_OnDisconnect(ip string) {
+	if config.MaxConnectionsPerIP < 1 {
+		return
+	}
+
+	mu.Lock()
+	defer mu.Unlock()
+
 	conns, ok := ips[ip]
 	if !ok {
 		return

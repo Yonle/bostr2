@@ -18,8 +18,8 @@ func ConnPerIPRateLimit_Pass(ip string, w http.ResponseWriter) (pass bool) {
 	}
 
 	if conns >= config.MaxConnectionsPerIP {
-		HijackAndKill(w)
-		log.Printf("%s reached maximum connections per ip. rejecting", ip)
+		TooManyRequest(w)
+		log.Printf("%s rejected: Too many open connections", ip)
 		return false
 	}
 
@@ -37,7 +37,6 @@ func ConnPerIPRateLimit_OnDisconnect(ip string) {
 	conns--
 
 	if conns < 1 {
-		log.Printf("No more connections left from %s", ip)
 		delete(ips, ip)
 	} else {
 		ips[ip] = conns

@@ -12,6 +12,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
+	"github.com/Yonle/bostr2/pingpong"
 	"github.com/Yonle/bostr2/relayHandler"
 )
 
@@ -47,6 +48,8 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 	defer cancel()
 
+	go pingpong.Stare(ctx, cancel, conn)
+
 	var relaySession = relayHandler.NewSession(ctx)
 	var s = Session{
 		ClientIP: ip,
@@ -70,11 +73,15 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 	defer log.Printf("%s disconnect (%s)", ip, ua)
 
+	listenForMessages(ctx, conn, &s)
+}
+
+func listenForMessages(ctx context.Context, conn *websocket.Conn, s *Session) {
 listener:
 	for {
 		_, msg, err := conn.Read(ctx)
 		if err != nil {
-			log.Printf("%s: %v", ip, err)
+			log.Printf("%s: %v", s.ClientIP, err)
 			break listener
 		}
 

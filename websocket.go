@@ -16,6 +16,8 @@ import (
 )
 
 func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua string) {
+	defer ConnPerIPRateLimit_OnDisconnect(ip)
+
 	var AcceptOptions = &websocket.AcceptOptions{
 		InsecureSkipVerify: true,
 		CompressionMode:    websocket.CompressionContextTakeover,
@@ -34,7 +36,6 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 		return
 	}
 
-	defer ConnPerIPRateLimit_OnDisconnect(ip)
 	defer conn.CloseNow()
 
 	log.Printf("%s connected (%s)", ip, ua)

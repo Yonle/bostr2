@@ -2,8 +2,6 @@ module github.com/Yonle/bostr2
 
 go 1.21
 
-toolchain go1.23rc1
-
 require (
 	github.com/coder/websocket v1.8.12
 	github.com/goccy/go-yaml v1.12.0

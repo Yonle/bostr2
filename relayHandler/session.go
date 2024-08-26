@@ -51,9 +51,8 @@ listener:
 				conn.CloseNow()
 			}
 			break listener
-		default:
+		case <-time.After(5 * time.Second):
 			if err != nil {
-				time.Sleep(5 * time.Second)
 				continue listener
 			}
 		}
@@ -101,8 +100,7 @@ listener:
 		select {
 		case <-s.ctx.Done():
 			break listener
-		default:
-			time.Sleep(5 * time.Second)
+		case <-time.After(5 * time.Second):
 			continue listener
 		}
 	}

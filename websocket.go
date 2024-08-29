@@ -12,8 +12,8 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
-	"github.com/Yonle/bostr2/pingpong"
-	"github.com/Yonle/bostr2/relayHandler"
+	"codeberg.org/Yonle/bostr2/pingpong"
+	"codeberg.org/Yonle/bostr2/relayHandler"
 )
 
 func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua string) {

@@ -10,7 +10,7 @@ relays:
 nip_11:
   name: bostr2
   description: Nostr relay bouncer
-  software: git+https://github.com/Yonle/bostr2
+  software: git+https://codeberg.org/Yonle/bostr2
   pubkey: 0000000000000000000000000000000000000000000000000000000000000000
   contact: unset
   supported_nips:

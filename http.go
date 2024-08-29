@@ -23,7 +23,7 @@ func ShowInfo(w http.ResponseWriter, r *http.Request) {
 
 	str += fmt.Sprintf("\nConnect to wss://%s or ws://%s (if not using TLS)\n", r.Host, r.Host)
 
-	str += "\nPowered by bostr2 - https://github.com/Yonle/bostr2"
+	str += "\nPowered by bostr2 - https://codeberg.org/Yonle/bostr2"
 
 	fmt.Fprint(w, str)
 }

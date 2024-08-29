@@ -1,10 +1,10 @@
 # bostr2
-[bostr](https://github.com/Yonle/bostr) next generation
+[bostr](https://codeberg.org/Yonle/bostr) next generation
 
 # Installation instructions
 You will need to install [Go](https://go.dev) on your system. After installation, run the following command:
 ```
-go install github.com/Yonle/bostr2@latest
+go install codeberg.org/Yonle/bostr2@latest
 ```
 
 Then run:

@@ -12,7 +12,7 @@ import (
 	"github.com/coder/websocket"
 	"github.com/coder/websocket/wsjson"
 
-	"github.com/Yonle/bostr2/relayHandler"
+	"codeberg.org/Yonle/bostr2/relayHandler"
 )
 
 type SessionEvents map[string]map[string]struct{}

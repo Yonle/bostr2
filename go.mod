@@ -1,4 +1,4 @@
-module github.com/Yonle/bostr2
+module codeberg.org/Yonle/bostr2
 
 go 1.21
 

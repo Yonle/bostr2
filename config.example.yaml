@@ -28,3 +28,6 @@ nip_11:
 
 # 0 is infinity
 max_connections_per_ip: 3
+
+# user agent to use on connecting to upstream
+user_agent: bostr2 (https://codeberg.org/Yonle/bostr2) on wss://bostr.example.com - nostr relay proxy aggregator

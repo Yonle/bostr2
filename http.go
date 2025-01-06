@@ -8,6 +8,8 @@ import (
 	"net/http"
 	"os"
 	"strings"
+
+	"codeberg.org/Yonle/bostr2/relayHandler"
 )
 
 var config Config
@@ -106,10 +108,10 @@ func LoadFavicon() {
 	log.Printf("Loaded favicon (%s) into memory", config.Favicon)
 }
 
-func LoadConfig() {
-	log.Printf("Reading config file %s....\n", Config_Filename)
-
-	ReadConfig(Config_Filename, &config)
+func ConfigureRelayHandler() {
+	h := http.Header{}
+	h.Add("User-Agent", config.UserAgent)
+	relayHandler.DialOptions.HTTPHeader = h
 }
 
 func Serve() {

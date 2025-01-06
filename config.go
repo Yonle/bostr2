@@ -15,7 +15,8 @@ type Config struct {
 	Relays              []string
 	NIP_11              map[string]interface{} `yaml:"nip_11"`
 	Favicon             string
-	MaxConnectionsPerIP int `yaml:"max_connections_per_ip"`
+	MaxConnectionsPerIP int    `yaml:"max_connections_per_ip"`
+	UserAgent           string `yaml:"user-agent"`
 }
 
 //go:embed config.example.yaml
@@ -68,4 +69,10 @@ func ReadConfig(filename string, c *Config) {
 	if err := yaml.Unmarshal(data, c); err != nil {
 		panic(fmt.Sprintf("error when parsing %s: %s", filename, err))
 	}
+}
+
+func LoadConfig() {
+	log.Printf("Reading config file %s....\n", Config_Filename)
+
+	ReadConfig(Config_Filename, &config)
 }

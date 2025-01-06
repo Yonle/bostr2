@@ -13,5 +13,6 @@ func main() {
 
 	LoadConfig()
 	LoadFavicon()
+	ConfigureRelayHandler()
 	Serve()
 }

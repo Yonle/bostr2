@@ -5,9 +5,10 @@ import (
 	"github.com/coder/websocket"
 )
 
-func NewSession(ctx context.Context) RelaySession {
+func NewSession(ctx context.Context, ip string) RelaySession {
 	return RelaySession{
-		ctx: ctx,
+		ctx:      ctx,
+		clientIP: ip,
 
 		relays: make(SessionRelays),
 

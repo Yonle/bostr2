@@ -109,9 +109,9 @@ func LoadFavicon() {
 }
 
 func ConfigureRelayHandler() {
-	h := http.Header{}
-	h.Add("User-Agent", config.UserAgent)
-	relayHandler.DialOptions.HTTPHeader = h
+	if len(config.UserAgent) > 0 {
+		relayHandler.UserAgent = config.UserAgent
+	}
 }
 
 func Serve() {

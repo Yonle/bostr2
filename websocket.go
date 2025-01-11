@@ -50,7 +50,12 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 	go pingpong.Stare(ctx, cancel, conn)
 
-	var relaySession = relayHandler.NewSession(ctx)
+	var ip2up string
+	if config.ForwardClientIP {
+		ip2up = ip
+	}
+
+	var relaySession = relayHandler.NewSession(ctx, ip2up)
 	var s = Session{
 		ClientIP: ip,
 

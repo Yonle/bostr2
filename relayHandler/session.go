@@ -3,6 +3,7 @@ package relayHandler
 import (
 	"context"
 	"encoding/json"
+	"net/http"
 	"sync"
 	"time"
 
@@ -18,7 +19,8 @@ type RelaySession struct {
 	wg  sync.WaitGroup
 	mu  sync.RWMutex
 
-	relays SessionRelays
+	clientIP string
+	relays   SessionRelays
 
 	UpEVENT     MessageChan
 	UpEOSE      MessageChan
@@ -27,7 +29,7 @@ type RelaySession struct {
 	HowManyRelaysAreConnected int
 }
 
-var DialOptions = &websocket.DialOptions{}
+var UserAgent string = "bostr2 (https://codeberg.org/Yonle/bostr2) - nostr relay proxy aggregator"
 
 func (s *RelaySession) Init(r []string) {
 	s.wg.Add(len(r))
@@ -38,6 +40,16 @@ func (s *RelaySession) Init(r []string) {
 
 func (s *RelaySession) connect(url string) {
 	defer s.wg.Done()
+
+	h := http.Header{}
+	h.Add("User-Agent", UserAgent)
+	if len(s.clientIP) > 0 {
+		h.Add("X-Real-IP", s.clientIP)
+	}
+
+	DialOptions := &websocket.DialOptions{
+		HTTPHeader: h,
+	}
 
 listener:
 	for {

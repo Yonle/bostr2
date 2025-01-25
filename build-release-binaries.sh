@@ -81,12 +81,12 @@ removedists() {
 }
 
 compile() {
-	GOOS=$1
-	GOARCH=$2
+	export GOOS=$1
+	export GOARCH=$2
 
 	distdir="bostr2-$1-$2"
 	echo "--- Compiling for $GOOS/$GOARCH platform"
-	local WINEX=""
+	WINEX=""
 
 	if [ "$GOOS" == "windows" ]; then
 		WINEX=".exe"

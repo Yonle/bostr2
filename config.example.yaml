@@ -3,9 +3,15 @@ listen: localhost:8080
 
 favicon:
 
+# If relays is provided, then tracker could be optional
 relays:
-- wss://relay.example1.com
-- wss://relay.example2.com
+# - wss://relay.example1.com
+# - wss://relay.example2.com
+
+# If trackers is provided, then relays could be optional
+trackers:
+# - wss://tracker.example1.com
+# - wss://tracker.example2.com
 
 nip_11:
   name: bostr2

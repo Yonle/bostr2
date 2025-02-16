@@ -131,6 +131,10 @@ listener:
 			}
 
 			s.ClientEVENT <- data
+
+		case "DIR":
+			wsjson.Write(ctx, conn, append([]string{"DIR"}, config.Relays...))
+
 		default:
 			wsjson.Write(ctx, conn, [2]string{"NOTICE", fmt.Sprintf("error: unknown command %s", cmd)})
 		}

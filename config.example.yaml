@@ -3,6 +3,9 @@ listen: localhost:8080
 
 favicon:
 
+# your bostr address.
+my_address: wss://bostr.example.com
+
 # If relays is provided, then tracker could be optional
 relays:
 # - wss://relay.example1.com
@@ -31,6 +34,7 @@ nip_11:
   - 22
   - 33
   - 40
+  - NOC-02
 
 # 0 is infinity
 max_connections_per_ip: 3

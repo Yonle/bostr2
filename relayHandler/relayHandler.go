@@ -5,8 +5,8 @@ import (
 	"github.com/coder/websocket"
 )
 
-func NewSession(ctx context.Context, ip string) RelaySession {
-	return RelaySession{
+func NewSession(ctx context.Context, ip string) *RelaySession {
+	return &RelaySession{
 		ctx:      ctx,
 		clientIP: ip,
 

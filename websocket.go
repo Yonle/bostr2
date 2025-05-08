@@ -69,7 +69,7 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 
 		destroyed: make(chan struct{}),
 
-		relay: &relaySession,
+		relay: relaySession,
 		conn:  conn,
 		ctx:   ctx,
 	}

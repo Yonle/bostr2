@@ -13,11 +13,13 @@ import (
 type Config struct {
 	Listen              string
 	Relays              []string
+	Trackers            []string
 	NIP_11              map[string]interface{} `yaml:"nip_11"`
 	Favicon             string
 	MaxConnectionsPerIP int    `yaml:"max_connections_per_ip"`
 	UserAgent           string `yaml:"user_agent"`
 	ForwardClientIP     bool   `yaml:"forward_client_ip"`
+	MyAddress           string `yaml:"my_address"`
 }
 
 //go:embed config.example.yaml

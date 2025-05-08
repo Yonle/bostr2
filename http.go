@@ -17,13 +17,19 @@ var Config_Filename string
 var FaviconBytes []byte
 
 func ShowInfo(w http.ResponseWriter, r *http.Request) {
+	host := config.MyAddress
+
+	if len(host) == 0 {
+		host = fmt.Sprintf("wss://%s or ws://%s (if not using TLS)", r.Host, r.Host)
+	}
+
 	str := "bostr2 - bostr next generation\n\n"
 
 	for _, r := range config.Relays {
 		str += fmt.Sprintf("- %s\n", r)
 	}
 
-	str += fmt.Sprintf("\nConnect to wss://%s or ws://%s (if not using TLS)\n", r.Host, r.Host)
+	str += fmt.Sprintf("\nConnect your Nostr client to %s\n", host)
 
 	str += "\nPowered by bostr2 - https://codeberg.org/Yonle/bostr2"
 

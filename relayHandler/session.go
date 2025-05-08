@@ -3,6 +3,7 @@ package relayHandler
 import (
 	"context"
 	"encoding/json"
+	"log"
 	"net/http"
 	"sync"
 	"time"
@@ -102,6 +103,13 @@ listener:
 				s.UpEVENT <- data
 			case "EOSE":
 				s.UpEOSE <- data
+			case "NOTICE":
+				var notice string
+				if err := json.Unmarshal(data[1], &notice); err != nil {
+					continue messageListener
+				}
+
+				log.Printf("NOTICE(%s): %s", url, notice)
 			}
 		}
 

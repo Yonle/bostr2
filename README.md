@@ -9,6 +9,7 @@ go install codeberg.org/Yonle/bostr2@latest
 
 Then run:
 ```
+export PATH=$HOME/go/bin:$PATH
 bostr2
 ```
 

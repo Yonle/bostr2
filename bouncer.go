@@ -3,10 +3,12 @@ package main
 import (
 	"context"
 	"fmt"
+	"log"
 	"sync"
 
 	//"time"
 	"encoding/json"
+
 	"github.com/nbd-wtf/go-nostr"
 
 	"github.com/coder/websocket"
@@ -29,18 +31,21 @@ type Session struct {
 	ClientREQ    MessageChan
 	ClientCLOSE  MessageChan
 	ClientEVENT  MessageChan
+	ClientAUTH   MessageChan
 	clientEvents ClientEvents
 
 	events        SessionEvents
 	pendingEOSE   SessionEOSEs
 	subscriptions SessionSubs
 
+	authed bool
+	authID string
+
 	relay *relayHandler.RelaySession
 
-	destroyed chan struct{}
-	once      sync.Once
-	conn      *websocket.Conn
-	ctx       context.Context
+	once sync.Once
+	conn *websocket.Conn
+	ctx  context.Context
 }
 
 func (s *Session) Start() {
@@ -48,21 +53,14 @@ func (s *Session) Start() {
 }
 
 func (s *Session) StartListening() {
-	// deal with destroy request.
-	go func() {
-		<-s.ctx.Done()
-		/*go func() {
-			time.Sleep(7 * time.Second)
-			select {
-			case <-s.destroyed:
-			default:
-				panic("something hangs.")
-			}
-		}()*/
-		s.relay.Wait()
+	if len(config.AllowedPubkeys) == 0 {
+		s.authed = true // everyone is allowed
+	} else {
+		s.authed = false // whitelisted users only
+		s.doAuth()
+	}
 
-		close(s.destroyed)
-	}()
+	cctx := s.ctx.Done()
 
 	// deal with what upstream says
 	go func() {
@@ -107,7 +105,14 @@ func (s *Session) StartListening() {
 				}
 				s.handleClientEVENT(d)
 
-			case <-s.destroyed:
+			case d, open := <-s.ClientAUTH:
+				if !open {
+					continue listener
+				}
+				s.handleClientAUTH(d)
+
+			case <-cctx:
+				s.relay.Wait()
 				break listener
 			}
 		}
@@ -137,6 +142,11 @@ func (s *Session) handleClientREQ(d []json.RawMessage) {
 	var subID string
 	if err := json.Unmarshal(d[1], &subID); err != nil {
 		wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: received subID is not a string"})
+		return
+	}
+
+	if !s.authed {
+		wsjson.Write(s.ctx, s.conn, [3]string{"CLOSED", subID, "restricted: you're not logged in."})
 		return
 	}
 
@@ -185,12 +195,32 @@ func (s *Session) handleClientEVENT(d []json.RawMessage) {
 
 	id := event.GetID()
 
+	if !s.authed {
+		wsjson.Write(s.ctx, s.conn, [4]any{"OK", id, false, "restricted: you're not logged in."})
+		return
+	}
+
 	s.clientEvents = append(s.clientEvents, event)
 
 	s.once.Do(s.Start)
 	s.relay.Broadcast(d)
 
-	wsjson.Write(s.ctx, s.conn, [4]interface{}{"OK", id, true, ""})
+	wsjson.Write(s.ctx, s.conn, [4]any{"OK", id, true, ""})
+}
+
+func (s *Session) handleClientAUTH(d []json.RawMessage) {
+	var event nostr.Event
+	if err := event.UnmarshalJSON(d[1]); err != nil {
+		wsjson.Write(s.ctx, s.conn, [2]string{"NOTICE", "error: invalid EVENT"})
+		return
+	}
+
+	id := event.GetID()
+
+	valid, reason := s.verifyAuth(event)
+	log.Println("auth status:", event.PubKey, valid, reason)
+
+	wsjson.Write(s.ctx, s.conn, [4]any{"OK", id, valid, reason})
 }
 
 func (s *Session) handleUpstreamEVENT(d []json.RawMessage) {

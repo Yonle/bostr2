@@ -62,12 +62,11 @@ func Accept_Websocket(w http.ResponseWriter, r *http.Request, ip string, ua stri
 		ClientREQ:   make(MessageChan),
 		ClientCLOSE: make(MessageChan),
 		ClientEVENT: make(MessageChan),
+		ClientAUTH:  make(MessageChan),
 
 		events:        make(SessionEvents),
 		pendingEOSE:   make(SessionEOSEs),
 		subscriptions: make(SessionSubs),
-
-		destroyed: make(chan struct{}),
 
 		relay: relaySession,
 		conn:  conn,
@@ -131,7 +130,13 @@ listener:
 			}
 
 			s.ClientEVENT <- data
+		case "AUTH":
+			if len(data) < 2 {
+				wsjson.Write(ctx, conn, [2]string{"NOTICE", "error: invalid AUTH"})
+				continue listener
+			}
 
+			s.ClientAUTH <- data
 		case "DIR":
 			wsjson.Write(ctx, conn, append([]string{"DIR"}, config.Relays...))
 

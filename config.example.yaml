@@ -16,6 +16,11 @@ trackers:
 # - wss://tracker.example1.com
 # - wss://tracker.example2.com
 
+# Pubkey in hex
+allowed_pubkeys:
+# - 36xxxxxxxxxxx
+# - ...
+
 nip_11:
   name: bostr2
   description: Nostr relay bouncer

@@ -14,5 +14,6 @@ func main() {
 	LoadConfig()
 	LoadFavicon()
 	ConfigureRelayHandler()
+	prepareTrackers()
 	Serve()
 }

@@ -4,10 +4,11 @@ import (
 	"bufio"
 	_ "embed"
 	"fmt"
-	"github.com/goccy/go-yaml"
 	"log"
 	"os"
 	"strings"
+
+	"github.com/goccy/go-yaml"
 )
 
 type Config struct {
@@ -21,6 +22,7 @@ type Config struct {
 	ForwardClientIP     bool     `yaml:"forward_client_ip"`
 	MyAddress           string   `yaml:"my_address"`
 	AllowedPubkeys      []string `yaml:"allowed_pubkeys"`
+	allowedPubkeysSet   map[string]struct{}
 }
 
 //go:embed config.example.yaml
@@ -79,4 +81,11 @@ func LoadConfig() {
 	log.Printf("Reading config file %s....\n", Config_Filename)
 
 	ReadConfig(Config_Filename, &config)
+
+	if len(config.AllowedPubkeys) > 0 {
+		config.allowedPubkeysSet = make(map[string]struct{}, len(config.AllowedPubkeys))
+		for _, pk := range config.AllowedPubkeys {
+			config.allowedPubkeysSet[pk] = struct{}{}
+		}
+	}
 }

@@ -1,7 +1,6 @@
 package main
 
 import (
-	"slices"
 	"strconv"
 	"time"
 
@@ -34,7 +33,7 @@ func (s *Session) verifyAuth(ev nostr.Event) (bool, string) {
 		return false, "not 22242 kind"
 	}
 
-	if !slices.Contains(config.AllowedPubkeys, ev.PubKey) {
+	if _, ok := config.allowedPubkeysSet[ev.PubKey]; !ok {
 		return false, "unauthorized"
 	}
 

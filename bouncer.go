@@ -9,6 +9,7 @@ import (
 	//"time"
 	"encoding/json"
 
+	jlexer "github.com/mailru/easyjson/jlexer"
 	"github.com/nbd-wtf/go-nostr"
 
 	"github.com/coder/websocket"
@@ -234,16 +235,91 @@ func (s *Session) handleUpstreamEVENT(d []json.RawMessage) {
 	}
 
 	var event nostr.Event
-
-	if err := event.UnmarshalJSON(d[2]); err != nil {
+	in := &jlexer.Lexer{Data: d[2]}
+	isTopLevel := in.IsStart()
+	if in.IsNull() {
+		if isTopLevel {
+			in.Consumed()
+		}
+		in.Skip()
 		return
 	}
 
-	eventID := event.ID
-	if eventID == "" {
-		return
+	in.Delim('{')
+	for !in.IsDelim('}') {
+		key := in.UnsafeFieldName(true)
+		in.WantColon()
+		if in.IsNull() {
+			in.Skip()
+			in.WantComma()
+			continue
+		}
+		switch key {
+		case "id":
+			event.ID = in.String()
+			if event.ID == "" {
+				return
+			}
+			if _, ok := s.events[subID][event.ID]; ok {
+				return
+			}
+		case "pubkey":
+			event.PubKey = in.String()
+		case "created_at":
+			event.CreatedAt = nostr.Timestamp(in.Int64())
+		case "kind":
+			event.Kind = in.Int()
+		case "tags":
+			if in.IsNull() {
+				in.Skip()
+				event.Tags = nil
+			} else {
+				in.Delim('[')
+				if event.Tags == nil {
+					if !in.IsDelim(']') {
+						event.Tags = make(nostr.Tags, 0, 7)
+					} else {
+						event.Tags = nostr.Tags{}
+					}
+				} else {
+					event.Tags = (event.Tags)[:0]
+				}
+				for !in.IsDelim(']') {
+					var tag nostr.Tag
+					if in.IsNull() {
+						in.Skip()
+						tag = nil
+					} else {
+						in.Delim('[')
+						if !in.IsDelim(']') {
+							tag = make(nostr.Tag, 0, 5)
+						} else {
+							tag = nostr.Tag{}
+						}
+						for !in.IsDelim(']') {
+							tag = append(tag, in.String())
+							in.WantComma()
+						}
+						in.Delim(']')
+					}
+					event.Tags = append(event.Tags, tag)
+					in.WantComma()
+				}
+				in.Delim(']')
+			}
+		case "content", "sig":
+			in.Skip()
+		default:
+			in.Skip()
+		}
+		in.WantComma()
 	}
-	if _, ok := s.events[subID][eventID]; ok {
+	in.Delim('}')
+	if isTopLevel {
+		in.Consumed()
+	}
+
+	if in.Error() != nil || event.ID == "" {
 		return
 	}
 
@@ -253,7 +329,7 @@ func (s *Session) handleUpstreamEVENT(d []json.RawMessage) {
 		return
 	}
 
-	s.events[subID][eventID] = struct{}{}
+	s.events[subID][event.ID] = struct{}{}
 	wsjson.Write(s.ctx, s.conn, d)
 
 	if _, ok := s.pendingEOSE[subID]; ok {

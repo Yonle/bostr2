@@ -239,8 +239,10 @@ func (s *Session) handleUpstreamEVENT(d []json.RawMessage) {
 		return
 	}
 
-	eventID := event.GetID()
-
+	eventID := event.ID
+	if eventID == "" {
+		return
+	}
 	if _, ok := s.events[subID][eventID]; ok {
 		return
 	}
